@@ -1,0 +1,463 @@
+\documentclass{article}
+
+\usepackage{amsthm, amsmath, amssymb}
+\usepackage{tikz}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{definition}[theorem]{Definition}
+
+\newcommand{\dor}[1]{\ensuremath{o(#1)}}
+
+\title{Finding a distiguished representative of a Markov equivalence
+  class}
+\author{James Cussens}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+
+Typically in (search-and-score) BN learning the goal is to identify
+the Markov equivalence class (MEC) of BNs with optimal score. If the
+output of a BN learner is a DAG, then in this typical situation it
+does not matter which DAG in a MEC is returned. This motivates adding
+`symmetry-breaking' constraints to a BN learner so that exactly one
+DAG in each MEC is feasible. The hope is that these additional
+constraints may also make learning faster.
+
+In this report we describe and analyse one choice of constraint which
+ensures that only one representative from each MEC is feasible. We
+call the surviving representatives \emph{distiguished
+  representatives}. My approach starts from the observation that the
+vertices of a DAG can be topologically ordered (where parents come
+before children). Each DAG has at least one topological order but
+typically more than one. However, one can associate a unique
+topological order for each DAG $G$ by ordering topological orders and
+choosing, for each DAG, the `highest' topological order it
+has---denoted $\dor{G}$. I will call $\dor{G}$ the \emph{distinguished
+  topological order} for the DAG and will typically abbreviate this to
+just \emph{distinguished order}. Choosing a distinguished order is
+equivalent to choosing a particular `tie-breaking' approach when
+constructing a topological order for a DAG.
+
+Each DAG in a MEC has the same undirected skeleton. From this it
+follows that if $G_1$ and $G_2$ are two distinct DAGs in a MEC then
+there must be at least one edge $a\rightarrow b$ in $G_1$ such that
+$a\leftarrow b$ is an edge in $G_2$. It follows that no two distinct
+DAGs in a MEC can have the same topological order, and thus no two
+distinct DAGs can have the same distinguished order. The distinguished
+representatives for a MEC is then defined to be a graph $G^*$ in the
+MEC such that $\dor{G} < \dor{G^*}$ for any other $G$ in the MEC. 
+
+The rest of the report is structured as follows. In
+Section~\ref{sec:orderings} my choice of how to order topological
+orders is presented. \dots
+
+
+\section{Ordering orderings}
+\label{sec:orderings}
+
+Let $V = \{v_{1},\dots, v_{n}\}$ be a set of vertices. Consider the
+$n!$ different permutations of the sequence $v_{1},\dots,
+v_{n}$. These can be thought of as all possibe topological orderings
+defined on $V$. I
+will (totally) order these permutations using colexicograpic
+ordering. Let $a_{1}a_{2}\dots a_{n}$ and $b_{1}b_{2}\dots a_{n}$ be
+two distinct permutations of $v_{1},\dots, v_{n}$. Then
+\begin{equation}
+  \label{eq:order}
+  a_{1}a_{2}\dots a_{n} < b_{1}b_{2}\dots b_{n} \mbox{ if $a_{i} <
+    b_{i}$ for the last $i$ where they differ}
+\end{equation}
+So, for example $321 < 231 < 312 < 132 < 213 < 123$. If
+$a_{1}a_{2}\dots a_{n} <  b_{1}b_{2}\dots b_{n}$ we will say that
+$b_{1}b_{2}\dots b_{n}$ is \emph{later} than $a_{1}a_{2}\dots
+a_{n}$. So that, for example, 123 is the latest permutation of the set
+$\{1,2,3\}$. 
+
+\section{Computing the distinguished ordering for a DAG}
+\label{sec:dordag}
+
+Here is an algorithm for finding the distinguished topological 
+ordering for a DAG $G$. It is just a fairly standard algorithm for
+constructing a topological sort with a particular choice of
+tie-breaking. Wlog I assume that the vertices are $\{1 \dots n\}$.
+
+\begin{verbatim}
+seq = empty
+while G is not empty
+  For i = n to 1:
+    If i is a sink in G:
+      seq = i,seq
+      G = G - i
+      break
+\end{verbatim}
+
+So we scan through the remaining vertices in G from highest to
+lowest. As soon as we come across a sink vertex that sink is added to
+the front of the ordering (\texttt{seq}) and that sink (and all edges
+pointing to it) are removed from G. If $a\rightarrow b$ is an edge in
+$G$ then $b$ will always be identified as a sink earlier than $a$ and
+so will be added to the front of the ordering \texttt{seq} before
+$a$. This shows that the returned ordering is indeed a topological
+ordering for
+$G$. 
+
+Now let $s_{1}$ and $s_{2}$ with $s_{1} < s_{2}$ be distinct
+topological orderings for some DAG $G$. Let $j$ be the latest
+index at which $s_1$ and $s_2$ differ, so $s_{1}(j) <
+s_{2}(j)$. $s_{1}$ cannot be the ordering $\dor{G}$ returned by
+our algorithm, since at the point at which $\dor{G}(j)$ is determined
+$s_{2}(j)$ is a sink. Since $s_{1}(j) < s_{2}(j)$, $s_{1}(j)$ will not
+be selected as the sink. Instead $s_{2}(j)$ or perhaps some even
+greater vertex will be selected. This establishes that the algorithm
+returns $\dor{G}$.
+
+\section{Computing the distinguished representative for a MEC}
+\label{sec:dormec}
+
+Computing the distinguished representative for the MEC of a given
+graph depends on repeatedly finding the highest vertex which can be
+made into a sink without destroying Markov equivalence. The full story
+requires a definition and a lemma.
+
+\begin{definition}
+  Let $G = (V,E)$ be a DAG and let $v \in V$. Let $G_v$ be identical
+  to $G$ except that any edges coming out from $v$ are reversed, so
+  that $v$ is a sink in $G_v$. Note that $G_v$ is also a DAG.
+\end{definition}
+Our key result if that if $G \not\sim G_{v}$ then there is no graph
+which is Markov equivalent to $G$ and has $v$ as a sink.
+
+\begin{lemma}
+\label{lem:main}
+  Let $G = (V,E)$ be a DAG and let $v \in V$ then $G \sim G_{v}$ if and only if
+  $\exists G'$ such that $G' \sim G$ and $v$ is a sink in $G'$ .
+\end{lemma}
+\begin{proof}
+  Clearly if $G \sim G_{v}$ then we can set $G' = G_{v}$. So suppose
+  that $G \not\sim G_{v}$. In this case, since $G'$ and $G_v$ have the same
+  undirected skeleton they must have different immoralities.
+
+  Consider the case where $G_v$ has an
+  immorality $a \rightarrow v \leftarrow b$ that was not present in
+  $G$. Now consider a candidate $G'$. Since $v$ has to be a sink in $G'$ and
+  must have the same undirected skeleton as $G$ (since $G' \sim G$),
+  $G'$ must also contain the immorality $a \rightarrow v \leftarrow
+  b$. But this contradicts $G' \sim G$ since $G$ did not have this
+  immorality. So no such $G'$ is possible.
+
+  Now suppose that $G_v$ lacks an immorality that $G$ possesses. Such
+  an immorality must be of the form $b \rightarrow a \leftarrow v$. No
+  graph which has $v$ as a sink can possess this immorality, so there
+  can be no $G'$ with $v$ as a sink and where $G\sim G'$.
+\end{proof}
+
+\begin{corollary}
+\label{cor:main2}
+  Let $G = (V,E)$ be a DAG. Let $v \in V$ be the highest vertex such
+  that $G \sim G_{v}$. Then there is no graph $G'$ such that $G' \sim
+  G$ and $G'$ has a sink which is higher than $v$.
+\end{corollary}
+\begin{proof}
+  Immediate from Lemma~\ref{lem:main}.
+\end{proof}
+
+
+\begin{corollary}
+  \label{cor:main3}
+  Let $G = (V,E)$ be a DAG. Let $v \in V$ be the highest vertex such
+  that $G \sim G_{v}$. Then $v$ is the final element in $\dor{G^*}$.
+\end{corollary}
+\begin{proof}
+  Immediate from Corollary~\ref{cor:main2}.
+\end{proof}
+
+
+Given a particular DAG $G$ the following algorithm computes the
+distinguished representative $G^*$ for that DAG's MEC. The distinguished
+order of the distinguished representative $\dor{G^{*}}$ is also returned.
+
+{\samepage
+\begin{verbatim}
+Function dr(G: a DAG with vertices 1 ... n)
+---------------------
+If G is empty:
+  return G, ()
+Else:
+  For i = n .. 1:
+    If G ~ G_i:
+      G',seq = dr(G_i - i)
+      G* = G' + i
+      seq = seq,i
+      return G*, seq
+\end{verbatim}
+}
+
+If the function \texttt{dr} is presented with a non-empty graph $G$
+then it looks for the highest vertex $i$ which can be made into a sink
+(by reversing 0 or more edges) while maintaining Markov equivalence to
+$G$. (Note that such a vertex is always found since $G$ has at least
+one sink.) The distinguished representative $G^*$ for $G_{i}
+- i$, which is $G_i$ with the sink $i$ and all edges to it removed, is
+then computed. Then the previously removed $i$ and its edges are
+bolted back onto $G^*$.
+
+We can prove that the algorithm is correct by induction on the number
+of vertices $V$ in $G = (V,E)$. The algorithm is clearly correct when
+$|V|=0$. Assume then that the algorithm is correct whenever $|V|=k-1$
+($k>0$) and suppose now that $|V| = k$. From Corollary~\ref{cor:main3}
+we know that the algorithm identifies the highest vertex $i$ such that
+there exists a graph $G'$ in which $i$ is a sink and $G' \sim G$. It
+follows that $i$ must be a sink in $G^*$ and $i$ is the final element
+of $\dor{G^{*}}$. Since $G^{*} \sim G$ they have the same undirected
+skeleton so the edges to $i$ in $G^{*}$ are exactly those produced by
+reversing (zero or more) edges in $G$.
+
+By induction, we know that the recursive call correctly returns the
+distinguished representative (and accompanying order) for $G_{i} -
+i$. We now show that $G' + i$ is indeed $G^*$, the distinguished
+representative for $G$. We first show that $G' + i \sim G_{i}$. Since
+$G' \sim G_{i} - i$ (by inductive assumpion) it follows that $G' + i$
+and $G_i$ have the same undirected skeleton. By construction the set
+of immoralities where $i$ is the child must be identical in $G' + i$
+and $G_i$. Since $i$ is a sink in both $G' + i$ and $G_i$ there are no
+immoralities in either where $i$ is a parent. The set of immoralities
+not involving $i$ must be identical in $G' + i$ and $G_i$ since $G'
+\sim G_{i} - i$ (by inductive assumpion). So $G' + i \sim G_i$ and so,
+since $G \sim G_{i}$, $G' + i \sim G$.
+
+
+
+
+\section{Checking whether a DAG is a distinguished representative}
+\label{sec:check}
+
+Given an DAG $G$ we can, of course, check whether $G=G^{*}$ by
+constructing $G^*$ using function \texttt{dr} and then seeing whether
+$G$ and $G^*$ differ. However, it is, of course, far more efficient to
+stop if and when it becomes apparent that $G$ and $G^*$. This occurs
+if the highest vertex that can be made into a sink (while maintaining
+Markov equivalence) is not already a sink in $G$. Here is the relevant
+checking algorithm.
+
+{\samepage
+\begin{verbatim}
+While G not empty:
+  For i = n ... 1
+    If i in G and G ~ G_i:
+      If G != G_i:
+        Return NO
+      G = G_i - i
+      break
+Return YES
+\end{verbatim}
+}
+
+\section{Essential graphs and distinguished representatives}
+\label{sec:essentials}
+
+Here are some \emph{essential graphs}
+\cite{andersson97:_charac_markov_equiv_class_acycl_digrap} and the
+corresponding distinguished representative DAGs.
+
+\begin{figure}
+  \centering
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (0,1) {2};
+      \node (3) at (1,0) {3};
+      \node (4) at (1,1) {4};
+      \draw[->,thick] (1) -- (4);
+      \draw[thick] (1) -- (2);
+      \draw[thick] (1) -- (3);
+      \draw[->,thick] (2) -- (4);
+      \draw[->,thick] (3) -- (4);
+    \end{tikzpicture} \hspace{1cm}
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (0,1) {2};
+      \node (3) at (1,0) {3};
+      \node (4) at (1,1) {4};
+      \draw[->,thick] (1) -- (4);
+      \draw[->,thick] (1) -- (2);
+      \draw[->,thick] (1) -- (3);
+      \draw[->,thick] (2) -- (4);
+      \draw[->,thick] (3) -- (4);
+    \end{tikzpicture}
+
+
+  \caption{Essential graph and corresponding distinguished representative}
+  \label{fig:ess1}
+\end{figure}
+
+\begin{figure}
+  \centering
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (0,1) {2};
+      \node (3) at (1,0) {3};
+      \node (4) at (1,1) {4};
+      \draw[->,thick] (4) -- (1);
+      \draw[->,thick] (2) -- (1);
+      \draw[->,thick] (3) -- (1);
+      \draw[thick] (2) -- (4);
+      \draw[thick] (3) -- (4);
+    \end{tikzpicture} \hspace{1cm}
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (0,1) {2};
+      \node (3) at (1,0) {3};
+      \node (4) at (1,1) {4};
+      \draw[->,thick] (4) -- (1);
+      \draw[->,thick] (2) -- (1);
+      \draw[->,thick] (3) -- (1);
+      \draw[->,thick] (2) -- (4);
+      \draw[->,thick] (3) -- (4);
+    \end{tikzpicture}
+
+
+  \caption{Essential graph and corresponding distinguished representative}
+  \label{fig:ess2}
+\end{figure}
+
+
+\begin{figure}
+  \centering
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (1,0) {2};
+      \node (3) at (1,1) {3};
+      \node (4) at (2,0) {4};
+      \draw[thick] (1) -- (2);
+      \draw[thick] (2) -- (3);
+      \draw[thick] (2) -- (4);
+    \end{tikzpicture} \hspace{1cm}
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (1,0) {2};
+      \node (3) at (1,1) {3};
+      \node (4) at (2,0) {4};
+      \draw[->,thick] (1) -- (2);
+      \draw[->,thick] (2) -- (3);
+      \draw[->,thick] (2) -- (4);
+    \end{tikzpicture}
+
+
+  \caption{Essential graph and corresponding distinguished representative}
+  \label{fig:ess3}
+\end{figure}
+
+
+\begin{figure}
+  \centering
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (1,0) {4};
+      \node (3) at (1,1) {3};
+      \node (4) at (2,0) {2};
+      \draw[thick] (1) -- (2);
+      \draw[thick] (2) -- (3);
+      \draw[thick] (2) -- (4);
+    \end{tikzpicture} \hspace{1cm}
+   \begin{tikzpicture}
+      \node (1) at (0,0) {1};
+      \node (2) at (1,0) {4};
+      \node (3) at (1,1) {3};
+      \node (4) at (2,0) {2};
+      \draw[->,thick] (1) -- (2);
+      \draw[->,thick] (2) -- (3);
+      \draw[->,thick] (2) -- (4);
+    \end{tikzpicture}
+
+
+  \caption{Essential graph and corresponding distinguished representative}
+  \label{fig:ess3}
+\end{figure}
+
+
+\bibliographystyle{plain}
+\bibliography{jc}
+
+
+\end{document}
+
+\section{Useful lemmas}
+\label{sec:lemma}
+
+To get to an algorithm for determining whether a given DAG is the
+distinguished representative for its MEC the following simple lemmas are
+useful.  In the following $G \sim G'$ indicates that $G$ and $G'$ are
+Markov equivalent.
+
+
+
+\begin{lemma}
+  \label{lem:sinkremoval}
+  Let $G = (V,E)$ and $G' = (V,E')$ be Markov equivalent graphs
+  ($G \sim G'$) such that some vertex $v$ is a sink in both $G$ and
+  $G'$. Then $G - v \sim G' - v$.
+\end{lemma}
+\begin{proof}
+  Clearly $G - v$ and $G' - v$ have the same undirected
+  skeleton. Since $v$ is a sink (in both $G$ and $G'$) then its
+  removal cannot create an immorality. The only immoralities that can
+  be destroyed by the removal of $v$ are those of the form
+  $a \rightarrow v \leftarrow b$. But if such an immorality were
+  present in $G$ then it would also be present in $G'$ (and
+  vice-versa, by symmetry). Since $G$ and $G'$ have the same
+  immoralities it thus follows that $G - v$ and $G' - v$ have the same
+  immoralities, and so $G - v \sim G' - v$.
+\end{proof}
+
+Note that the converse of Lemma~\ref{lem:sinkremoval} is not true:
+the graph with two isolated vertices $a$ and $v$ is not Markov
+equivalent to the graph with a single edge $a \rightarrow v$, but
+removing $v$, which is a sink vertex in both graphs, produces two
+Markov equivalent graphs.
+
+\section{Algorithm}
+\label{sec:algo}
+
+Given a DAG $G$ the following algorithm returns $s(G^{*})$ the
+ordering associated with $G^*$ the distinguished representative for 
+\begin{verbatim}
+seq = empty
+While G not empty:
+  For i = n ... 1
+    If i in G and G ~ G_i:
+      seq = i,seq
+      G = G_i - i
+      break
+Return seq
+\end{verbatim}
+
+Given a DAG $G$ the following algorithm determines whether $G$ is the
+distinguished representative of its MEC or not.
+
+
+
+So we repeatedly look for vertices $i$ such that if we made $i$ a sink
+the MEC would not change. Note that there is always at least one such
+$i$ since $G$ will have a sink: clearly `making that a sink' does not
+alter $G$ and so the MEC does not change. If at any point we find such
+a vertex $i$ which is not already a sink of $G$ then we conclude that
+$G$ is not a distinguished representative. This is because the order
+associated with $G_i$ comes later than that of $G$.
+
+Correctness: Suppose NO is returned. Then consider the graph
+$G_{i}$. We have $G \sim G_{i}$ but there is an ordering consistent
+with $G_{i}$ which is later than any ordering for $G$, since $i$ is a
+sink for $G_i$ and not for $G$ and there is no higher sink for
+$G$. (Note that we are ignoring the vertices already eliminated since
+these are same for $G$ and $G_i$.) 
+
+
+
+\end{document}

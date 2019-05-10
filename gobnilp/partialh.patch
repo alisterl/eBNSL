@@ -1,0 +1,59 @@
+16,17c16,17
+< /**@file   cons_lop.h
+<  * @brief  constraint handler for linear ordering constraints
+---
+> /**@file   cons_partialordering.h
+>  * @brief  constraint handler for partial ordering constraints
+20,21c20
+<  * This constraint ensures that a given square matrix of binary variables corresponds to a
+<  * tournament, i.e., it is an acyclic orientation of the complete graph. This encodes a linear order
+---
+>  * This constraint a partial order
+25c24
+<  * In this constraint handler we only add the symmetry equations and separate the triangle
+---
+>  * In this constraint handler we only add the symmetry inequalities and separate the triangle
+33,34c32,33
+< #ifndef __LOP_CONS_LOP_H__
+< #define __LOP_CONS_LOP_H__
+---
+> #ifndef __LOP_CONS_PARTIALORDERING_H__
+> #define __LOP_CONS_PARTIALORDERING_H__
+37a37
+> #include "parent_set_data.h"
+43c43
+< /** creates the handler for linear ordering constraints and includes it in SCIP */
+---
+> /** creates the handler for partial ordering constraints and includes it in SCIP */
+45c45
+< SCIP_RETCODE SCIPincludeConshdlrLOP(
+---
+> SCIP_RETCODE SCIPincludeConshdlrPartialOrdering(
+49c49
+< /** creates and captures a linear ordering constraint */
+---
+> /** creates and captures a partial ordering constraint */
+51c51
+< SCIP_RETCODE SCIPcreateConsLOP(
+---
+> SCIP_RETCODE SCIPcreateConsPartialOrdering(
+56a57,58
+>    ParentSetData*        psd,                /**< contains arrow and parent set variables */
+>    SCIP_Bool             minimal,            /**< whether the partial order must minimal while being consistent with arrows */
+67a70,85
+>    );
+> 
+> 
+> /** creates and captures a partial ordering constraint with all its constraint flags set to their
+>  *  default values
+>  *
+>  */
+> extern
+> SCIP_RETCODE SCIPcreateConsBasicPartialOrdering(
+>    SCIP*                 scip,               /**< SCIP data structure */
+>    SCIP_CONS**           cons,               /**< pointer to hold the created constraint */
+>    const char*           name,               /**< name of constraint */
+>    int                   n,                  /**< number of elements */
+>    SCIP_VAR***           vars,               /**< n x n matrix of binary variables */
+>    ParentSetData*        psd,                /**< contains arrow and parent set variables */
+>    SCIP_Bool             minimal             /**< whether the partial order must minimal while being consistent with arrows */

@@ -1,0 +1,3449 @@
+\documentclass{report}
+
+% This line just suppresses all the overfull hbox warnings
+\hfuzz=1000pt
+
+\usepackage{url}
+\usepackage{amsthm}
+\usepackage{algpseudocode}
+
+\newcommand{\gobnilp}{\textsf{GOBNILP}}
+\newcommand{\scip}{\textsf{SCIP}}
+\newcommand{\vbctool}{\textsf{VBCTOOL}}
+\newcommand{\gdb}{\textsf{gdb}}
+\newcommand{\cplex}{\textsf{CPLEX}}
+\newcommand{\version}{``Development version''}
+\newcommand{\scipversion}{5.0.1}
+
+\newcommand{\x}[1]{\ensuremath{I(#1)}}
+\newcommand{\fv}[2]{\ensuremath{\x{#1 \rightarrow #2}}}
+\newcommand{\varsubset}{\ensuremath{W}}
+
+\newtheorem{lemma}{Lemma}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+
+\title{GOBNILP \version{} User/Developer Manual\footnote{GOBNILP version 1.3-1.6
+    was supported by MRC Project Grant G1002312}}
+\author{James Cussens, Mark Bartlett\\University of York}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Downloading and installing}
+\label{sec:install}
+
+\gobnilp{} is distributed under the GNU Public Licence (version 3) and
+is available for download via
+\url{http://www.cs.york.ac.uk/aig/sw/gobnilp}. The following
+installation instructions assume that you are using Linux. (We suspect
+it would not be too hard to install under Windows or Mac as long as
+you have a C compiler and the `make' utility.)
+\begin{enumerate}
+\item Assuming you meet the relevant licence conditions (
+  \url{http://scip.zib.de/licence.shtml} ), download \scip{} (
+  \url{http://scip.zib.de}) if you do not already have it
+  installed. \gobnilp{} \version{} has only been tested using \scip{} \scipversion{}
+  (the current \scip{} version at time of writing) so please use that
+  version. We expect that it will work with future versions of \scip{}.
+\item Install \scip{} using ``make'' rather than ``cmake'' following
+  the relevant instructions that come with \scip{}. If you have \cplex{}
+  installed be sure to make a \cplex-linked version of SCIP.
+\item Let \verb+<version>+ denote the \gobnilp{} version that you have
+  downloaded. Do \verb+ tar zxf gobnilp<version>.tar.gz+ (if you downloaded the
+  \verb+.tgz+ archive) or \verb+unzip gobnilp<version>.zip+ (if you
+  downloaded the \verb+.zip+ file) to put the \gobnilp{} distribution
+  in a directory of your choosing. This directory will be called
+  \verb+$(GOBNILPDIR)+ in what follows.
+\item If you want to use \gobnilp{} to learn Gaussian networks you
+  will need to install the BLAS, LAPACK and LAPACKE libraries. One
+  easy way of doing this is to install OpenBLAS from source (OpenBLAS
+  contains LAPACK and LAPACKE). Download the OpenBLAS source from
+  \url{https://www.openblas.net/}, decide on a directory to install it
+  (let's refer to this directory as \verb+$(BLASDIR)+)
+and do:
+\begin{samepage}
+\begin{verbatim}
+tar zxvf OpenBLAS-0.2.20.tar.gz
+cd OpenBLAS-0.2.20
+make
+make install PREFIX=$(BLASDIR)
+\end{verbatim}
+\end{samepage}
+\item \label{noblas}Ensure \verb+$(GOBNILPDIR)+ is your current working
+  directory. If you have not installed OpenBLAS 
+   run \\
+   \verb+./configure.sh $(SCIPDIR)+ where \verb+$(SCIPDIR)+ is the
+   directory where you installed \scip .  For example,\\
+   \verb+./configure.sh /opt/scipoptsuite-5.0.1/scip-5.0.1+ .  This will
+   create a soft link \verb+scip+ in \verb+$(GOBNILPDIR)+ that links to
+   \verb+$(SCIPDIR)+, which is needed by the \gobnilp\ make file to find
+   the \scip\ files.  This script will also copy
+   \verb+$(SCIPDIR)/examples/LOP/src/cons_linearordering.c+ and
+   \verb+$(SCIPDIR)/examples/LOP/src/cons_linearordering.h+ into\\
+   \verb+$(GOBNILPDIR)/src+. It will also create partial order
+   constraint handler files \verb+$(SCIPDIR)/examples/LOP/src/cons_partialordering.c+ and
+   \verb+$(SCIPDIR)/examples/LOP/src/cons_partialordering.h+
+ \item If you have installed OpenBLAS run\\
+\verb+./configure.sh $(SCIPDIR) $(BLASDIR)+ \\
+In addition to the processing mentioned in \ref{noblas}.\ this will
+edit the \gobnilp{} Makefile to link to the OpenBLAS library.
+%\item Edit the file \verb+$(GOBNILPDIR)/Makefile+ so that the Makefile variable
+%  \verb+SCIPDIR+ is set to be the directory where you have chosen to install
+%  \scip. (This will be the directory you were in when you typed \texttt{make}
+%  (or \texttt{make LPS=cpx}) to compile \scip.)
+%\item Let \verb+$(SCIPDIR)+ be the directory where you have chosen to
+%  install \scip. Copy the files
+%  \verb+$(SCIPDIR)/examples/LOP/src/cons_linearordering.c+ and
+%  \verb+$(SCIPDIR)/examples/LOP/src/cons_linearordering.h+ into
+%  \verb+$(GOBNILPDIR)/src+.
+\item Ensure \verb+$(GOBNILPDIR)+ is your current working
+  directory.
+  Type \verb+make+ or, if you have \cplex{} installed,
+  \verb+make LPS=cpx+.
+\item An executable \verb+$(GOBNILPDIR)/bin/gobnilp+ will be
+  created. This will be a symbolic link to a file with a much longer name.
+\item If you have doxygen installed you can use it to create HTML
+  documentation for the \gobnilp{} source code. To do this do
+  \verb+make docs+ and then point your web browser at
+  \verb+$(GOBNILPDIR)/docs/html/index.html+. You can edit the file
+  \texttt{Doxyfile} in the \gobnilp{} distribution to alter the sort
+  of HTML documentation you get.
+\item If you have any problems installing you may need to run
+  \verb+make clean+ which will remove everything the other make
+  targets create.
+\end{enumerate}
+
+If you are using \gobnilp{} we would appreciate it if you let us
+know. Please do so by email to \url{james.cussens@york.ac.uk} and put
+gobnilp somewhere in the subject header. We are particularly keen to
+hear about any problems you may have with \gobnilp.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Quick start}
+\label{sec:quick}
+
+\gobnilp{} can learn Bayesian networks from complete discrete data. The
+simplest way to do this is to give the name of the file containing the
+data as a command line argument:
+\begin{verbatim}
+bin/gobnilp data/asia_100.dat
+\end{verbatim}
+To run \gobnilp{} in this way it is essential that  the filename
+has a \verb+.dat+ extension and that the data is in the right format.
+An example data file \verb+asia_100.dat+
+is provided with the \gobnilp{} distribution (in the \verb+data+
+directory). Note that it is essential that there is no trailing
+whitespace at the end of lines in the data file. Details on the
+correct data file format are given in
+Section~\ref{sec:datainputformat}.
+
+By default \gobnilp{} searches for the BN with the highest BDeu score
+(log marginal likelihood) \textbf{subject to no node having more than
+  3 parents}. This limit on the number of parents can be raised (or
+lowered); see Section~\ref{sec:global} for details. By default the
+BDeu score is computed using an \emph{effective sample size} of
+1. This too can be altered.
+
+Alternatively, \gobnilp{} can learn Gaussian BNs using BGe scoring
+(see Section~\ref{sec:datainput}) or learn BNs from cached (typically pruned)
+`local scores'. Local score input is the default so unless you
+indicate otherwise (by, for example, using a \texttt{.dat} filename
+extension) \gobnilp{} will assume the input is of this sort. So, for
+example, if the filename extension is \verb+.scores+ \gobnilp{} will
+assume it is a file of local scores in the right format. So you can
+do:
+\begin{verbatim}
+bin/gobnilp data/asia_100_1_3.scores
+\end{verbatim}
+An example local score file \verb+asia_100_1_3.scores+ is provided with
+the \gobnilp{} distribution (in the \verb+data+ directory).
+Details on the correct local scores file format are given in
+Section~\ref{sec:scorefileformat}.
+
+By default, \gobnilp{} prints out the learned BN structure with one
+line for each node specifying its parents and the local score for that
+choice of parents. Other output formats are available as described in
+Section~\ref{sec:output}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Basic usage}
+\label{sec:basic}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Running \gobnilp}
+
+\gobnilp\ is run from the command line and takes a number of optional
+arguments followed by the name of a file containing the information
+about the variables for which the Bayesian network is to be found.
+For example:
+\begin{verbatim}
+bin/gobnilp alarm100_1_3.scores
+\end{verbatim}
+runs \gobnilp\ using the local scores found in
+\texttt{alarm100\_1\_3.scores}.
+If the filename is given as \texttt{-} then \gobnilp\ will from standard input.
+
+\gobnilp\ currently recognises five command line arguments.
+
+\vspace{1em}\noindent
+\begin{tabular}[h]{p{2cm} p{\linewidth}}
+   \texttt{-g=}\textit{filename} &
+         Sets the file from which parameters are read (see
+         Section~\ref{sec:settingfile}).\\
+   \texttt{-f=}\textit{format} &
+         Sets the input file format (see Section~\ref{sec:input}).\\
+   \texttt{-x} &
+         Create the model and exit before solving it (see
+         Chapter~\ref{chap:xflag}).\\
+   \texttt{-q=}\textit{filename} &
+         Sets the frequency file for pedigree learning (see
+         Chapter~\ref{sec:pedigree}).\\
+   \texttt{-v=}\textit{level} &
+         Set the verbosity level of the output.\\
+\end{tabular}
+\vspace{1em}
+
+Verbosity can be set to any value between 0 and 5.  Levels 0 and 1
+just display error and warning messages.  Level 2 gives additional
+information about the system being run and file output.  Level 3 is the
+default and gives basic information about the progress of the search.
+Level 4 gives more detailed information about the progress of the
+search, while level 5 also displays detailed statistics about the search
+once the BN has been found.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Settings}
+\label{sec:settingfile}
+
+Changes to \gobnilp 's behaviour are affected using a settings file.
+A settings file consists of a set of parameters and values, each on a
+line of its own.  Lines beginning with a \verb+#+ are treated as
+comments and blank lines are also permitted.
+
+Each parameter setting is of the form \verb+parameter = value+ where
+\texttt{parameter} is the name of the parameter and \texttt{value} is a permitted value
+for that parameter.  Parameters which take a string value should have
+their value given in quotation marks.  For example, the following sets
+the \verb+gobnilp/outputfile/solution+ parameter to \verb+output.txt+.
+\begin{verbatim}
+gobnilp/outputfile/solution = "output.txt"
+\end{verbatim}
+A full list of \gobnilp\ parameters is given in
+Chapter~\ref{chap:gobnilpparams}.  The settings files can also be used
+to alter any of \scip 's parameters.
+
+By default, \gobnilp\ tries to load parameters from the file
+\verb+gobnilp.set+ in the current working directory.  If it cannot find
+this file, it will run using default settings.  An alternative setting
+file can be specified using the \verb+-g+ command line argument.  For
+example, to run \gobnilp\ on \verb+data/asia_100.dat+ with settings
+stored in the file \verb+mysetttings.txt+, the following command should
+be given
+\begin{verbatim}
+bin/gobnilp -g=mysettings.txt data/asia_100.dat
+\end{verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{\gobnilp{} output formats}
+\label{sec:output}
+
+\gobnilp\ can output the learned BN structure in several formats.  By
+default, \gobnilp\ displays the resulting BN and some score
+information on screen.  This information can be instead redirected to
+a file by using the \\
+\texttt{gobnilp/outputfile/solution} parameter.
+This parameter's default value of \texttt{"stdout"} tells \gobnilp\ to
+show the information on the screen.  If changed to \texttt{""}, it
+will not be shown at all and if given any other value, the information
+will be written to a file with that name.  This parameter, like all
+other \gobnilp{} parameters is set by adding a line to \gobnilp's parameter
+file which, by default, is called \texttt{gobnilp.set}
+and is in the current working directory. So for example, adding the
+following line (anywhere) to \texttt{gobnilp.set} will put the learned BN
+in the file \texttt{foo.bn}:
+\begin{verbatim}
+gobnilp/outputfile/solution = "foo.bn"
+\end{verbatim}
+
+There now follows a list of parameters which can be used to control
+what \gobnilp\ outputs and where. As always they are set by adding a
+suitable line to the file \texttt{gobnilp.set}.
+
+\begin{itemize}
+\item \texttt{gobnilp/outputfile/adjacencymatrix} is used to control
+  whether and where to output an adjacency matrix representation of
+  the found BN.  The adjacency matrix $A$ of a directed graph has
+  $A_{ij}=1$ if there is an arrow from $i$ to $j$ and $A_{ij}=0$ if
+  there is no such arrow. \gobnilp{} outputs each row of the adjacency
+  matrix on a separate line with columns separated by a single space
+  character. The first (top) line is the row for $i=0$. This format
+  has been chosen to make it convenient to read the matrices into R
+  \cite{team12:_r}.  If \texttt{bn.mat} is the name of the file
+  containing an adjacency matrix then
+\begin{verbatim}
+bn <- as.matrix(read.table("bn.mat",header=FALSE))
+\end{verbatim}
+will create an R (adjacency) matrix \texttt{bn}.
+
+\item \texttt{gobnilp/outputfile/dot} is used to control whether and
+  where to output a dot file that can be used by Graphviz to visualise
+  the found BN. See \texttt{http://www.graphviz.org/} for more
+  information on the file format and options for rendering this file.
+
+\item \texttt{gobnilp/outputfile/scoreandtime} is used to just output the
+  score of the found BN and the time taken to find it.  This can be useful
+  when the actual BN found is not of interest, for example running experiments
+  to compare \gobnilp\ to other systems or in testing during development.
+
+\item \texttt{gobnilp/outputfile/mec} is used to print out the
+   undirected skeleton of the found BN together with any immoralities
+   (v-structures). This determines the Markov equivalence class of the
+   BN. Since this information is printed out in a fixed format, two
+   Markov equivalent BNs will have exactly the same info printed out.
+
+\item \texttt{gobnilp/outputfile/pedigree} is used to output the found BN
+  as a pedigree.  This is only of interest when using \gobnilp\ for finding
+  pedigrees.  See Chapter~\ref{sec:pedigree}.
+\end{itemize}
+
+All the \texttt{gobnilp/outputfile/*} parameters function in the same way.
+If set to the empty string (\texttt{""}), they will suppress that output
+altogether.  If set to \texttt{"stdout"}, they display the appropriate
+information on the screen after each optimal BN is found.  If given any
+other value, they will attempt to write their output to a file with that
+name.  Any occurrence of \texttt{<probname>} will be replaced by the
+name of the current problem.
+
+In the case that more than one BN is being sought, (i.e.\
+\texttt{gobnilp/nbns} $> 1$, see Chapter~\ref{chap:gobnilpparams}), the filename
+that the \texttt{gobnilp/outputfile/} parameters try to write to will
+be modified to include the number of the current network.  For
+example, if \texttt{gobnilp/outputfile/solution = "output.bn"},
+\gobnilp\ will write the first optimal network found to
+\texttt{output\_1.bn}, the next to \texttt{output\_2.bn} and so on.
+
+As a full example of the use of these parameters, consider a settings file
+containing the following lines.
+\begin{verbatim}
+gobnilp/nbns = 10
+gobnilp/outputfile/solution = "stdout"
+gobnilp/outputfile/dot = "bn.dot"
+gobnilp/outputfile/adjacencymatrix = "bn.mat"
+gobnilp/outputfile/scoreandtime = "times/data"
+gobnilp/outputfile/pedigree = ""
+gobnilp/outputfile/mec = "mec/<probname>.out"
+\end{verbatim}
+When run, \gobnilp\ will find the 10 best networks in order.  After the
+n$^{\mbox{th}}$
+BN is found, the network will be output to screen, a representation of it as a dot
+file will be saved to \texttt{bn\_n.dot} for later rendering with
+Graphviz, an adjacency matrix representation will be save to
+\texttt{bn\_n.mat} and
+the network's score and the time to find it will be saved to \texttt{times/data\_n}.
+No pedigree information will be output to screen or file.  The Markov
+equivalence class will be output to a file that depends on the file
+used as input; if the input file was \texttt{scores.txt}, the
+output will be to \texttt{mec/scores\_n.out}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{\gobnilp{} input formats}
+\label{sec:input}
+
+In this section data and local score input formats are
+described. \gobnilp{} can also accept input in \scip's CIP format. See
+Section~\ref{sec:cip} for details on that.  Input for pedigree learning
+is discussed in Section~\ref{sec:pedigree}.
+
+\subsection{Data files}
+\label{sec:datainput}
+
+\gobnilp\ can read in a set of observations of
+discrete (resp.\ continuous) variables and search for the BN with the
+highest BDeu (resp.\ BGe) score.  To
+specify that this type of input is being given, \gobnilp\ should
+either be run using \texttt{-f=dat} as a command line argument or the
+file containing the data should be given a \texttt{.dat} filename
+extension.  For example:
+\begin{verbatim}
+gobnilp -f=dat observations.txt
+\end{verbatim}
+or
+\begin{verbatim}
+gobnilp observations.dat
+\end{verbatim}
+By default, \gobnilp{} assumes that data is discrete, so if learning
+from continuous data the following line should be included in your
+settings file:
+\begin{verbatim}
+gobnilp/scoring/continuous = TRUE
+\end{verbatim}
+By default your settings file is the file \verb+gobnilp.set+. To use a
+settings file with a different name see Section~\ref{sec:settingfile}.
+
+\subsubsection{Data file format}
+\label{sec:datainputformat}
+The data file consists of a set of observations of the variables.  Let
+the number of variables be $p$.  Each line of the file representing
+data should contain $p$ values with a separator between them.  Each
+such line represents a single datapoint.  The $i$th item on each line
+is the value of variable $i$ for that datapoint. Discrete values can
+take any type, e.g.\ integers, strings, Booleans.  Continuous values
+must be floats (e.g.\ 3.52). Any line starting with \texttt{\#} is
+viewed as a comment and ignored.
+
+In addition to the observations, variable names may also be given to
+make the output more intelligible.  Variable names are given on the
+first non-comment line of the file.  These should be given in the same
+format as the observations: on a single line with separators between
+them.  If no variable names are given, names will be automatically
+generated according to the column number with the variable name for the
+first column being `$0$' and the variable name for the last column being `$p-1$'.
+
+Finally, the arities of the discrete variables may also be given.
+This should be done on the first non-comment line after the variable
+names, or the first non-comment line in the file if no variable names
+are given.  The arities should state how many values each variable can
+take and follow the same format as the names and observations, except
+that values must be integers.  If arities are not given, \gobnilp{}
+assumes that the arity of a variable is just the number of distinct
+observed values for that variable.  \textbf{Note that inferred arities
+  may lead to incorrect BDeu scores if some possible values are never
+  observed in the dataset.} We recommend explicitly stating arities
+when learning from discrete data. Of course, arities should not be
+given when learning from continuous data!
+
+Since variable names and arities are optional in data files (and it is
+not always possible for \gobnilp{} to distinguish between names,
+arities and
+datapoints) the parameters
+\texttt{gobnilp/scoring/names} and \texttt{gobnilp/scoring/arities}
+are used to specify whether these are provided in the file (the
+default is that names are provided and, for discrete data, arities also). If you are
+getting errors when reading data into \gobnilp{} check that these
+parameters are set correctly.
+
+An example of the first few lines of a file for a dataset with 8
+discrete variables might look as follows:
+\begin{verbatim}
+# Data from experiment 1
+AAA T2  S       L B   X   D  E
+2   2   2       7 12  2   26 26
+yes no  absent  3 foo bar x  y
+yes yes present 4 bar foo z  x
+no  no  absent  0 bar bar d  y
+\end{verbatim}
+
+The first three lines of a continuous data file might look like this:
+\begin{verbatim}
+A B C D E F G
+1.113 1.932 7.074 8.660 0.881 24.719 9.216
+-0.247 11.334 24.347 23.355 7.040 36.812 3.678
+\end{verbatim}
+
+If the input given to \gobnilp\ is in the form of data, then a scorer
+is used to compute the local  scores.  There are a number of
+parameters that can be set to affect the scorer, primarily its input
+parser.
+
+The basic format of the data input file can be set using the
+\texttt{gobnilp/delimiter} parameter, which specifies the separator
+between values in the file.  This can be any character, \texttt{tab}
+or \texttt{whitespace} (which matches both the tab character and the
+space character).  \texttt{gobnilp/mergedelimiters} can be used to say
+whether consecutive delimiters should be merged into a single
+separator.  For example, the settings for white space delimited files
+would be:
+\begin{verbatim}
+gobnilp/delimiter = "whitespace"
+gobnilp/mergedelimiters = TRUE
+\end{verbatim}
+whereas CSV files would require these parameters to be set to:
+\begin{verbatim}
+gobnilp/delimiter = ","
+gobnilp/mergedelimiters = FALSE
+\end{verbatim}
+
+
+
+\subsection{Score files}
+\label{sec:scores}
+
+\gobnilp\ can read in a set of local scores and search for the BN with
+the highest overall score. Note that \gobnilp{} does not know or care
+what sort of local scores these are; they could be BIC, BDeu, BGe or some
+other sort of local score.  To specify that this type of input is
+being given, \gobnilp\ should either be run using \texttt{-f=jkl} as a
+command line argument or the file containing the data should be given
+a \texttt{.jkl} filename extension.  For example:
+\begin{verbatim}
+gobnilp -f=jkl scores.txt
+\end{verbatim}
+or
+\begin{verbatim}
+gobnilp scores.jkl
+\end{verbatim}
+Although this is the cleanest way of specifying local score input,
+this sort of input is the \gobnilp{} default, so if \gobnilp{} cannot
+deduce that the input is not local scores it will just assume that it is.
+
+\subsubsection{Score file format}
+\label{sec:scorefileformat}
+
+\begin{itemize}
+\item The first line is the total number of BN variables.
+\item The rest of the file has a section for each variable.
+\begin{itemize}
+\item The section for a variable starts with a single line with the
+  name of the variable and the number of parent sets recorded for
+  it. Variable names can be any string of characters not containing
+  white space.  For example, \texttt{1}, \texttt{var1}, or
+  \texttt{variable\_one} are all permissible variable names;
+  \texttt{variable one}, or \texttt{"var one"} are not.  For example
+
+\texttt{0 81}
+
+states that variable 0 has 81 candidate parent sets.
+\item The remaining lines in the section for a variable are local ('family') scores. Each such line starts with the score itself, the number of parents in the parent set and then the parents themselves, if any. So, for example,
+
+\texttt{-106.565548505 3 13 15 11}
+
+states that parent set $\{13,15,11\}$ has score -106.565548505 (and contains 3 members).
+\end{itemize}
+\end{itemize}
+
+This format originated with the work done Jaakkola et
+al.\cite{jaakkola10:_learn_bayes_networ_struc_lp_relax}.  Example
+input files ( \texttt{alarm\_10000\_1\_3.scores} and
+\texttt{alarm\_100\_1\_3.scores} ) are included in the \gobnilp\
+distribution. Further gzipped example input files in the right format
+are available at
+\url{http://www-users.cs.york.ac.uk/~jc/research/uai11/ua11_scores.tgz}
+and at \url{http://www.cs.york.ac.uk/aig/sw/gobnilp/data}. There is
+some overlap between the scores files at these two URLs, but since
+there has been some renaming (i.e.\ renumbering) of the variables they
+are not directly comparable.
+
+\subsection{How the expected input format is determined}
+
+The expected format of the input file it is determined using the
+following rules.
+\begin{enumerate}
+   \item If the \texttt{-f} command line argument is given, the stated format will be used.  For example:
+\begin{verbatim}
+gobnilp -f=dat data.txt
+\end{verbatim}
+   will cause \gobnilp\ to attempt to read the file \texttt{data.txt}
+   as a data file. The recognised values for \texttt{-f} are:
+   \texttt{jkl} for local scores, \texttt{dat} for data and
+   \texttt{cip} for CIP format.
+
+   \item If \texttt{-f} is not given, then the extension of the file will be used.  For example:
+\begin{verbatim}
+gobnilp data.cip
+\end{verbatim}
+   will cause \gobnilp\ to attempt to read the file \texttt{data.cip}
+   as a \scip\ CIP file (see Section~\ref{sec:cip}). The recognised
+   extensions are:
+   \texttt{jkl} for local scores, \texttt{dat} for data and
+   \texttt{cip} for CIP format.
+
+
+ \item If the \texttt{-f} flag is not present and the file extension
+   does not match any known type, \gobnilp\ assumes that it is being
+   given local scores and attempts to read the file as such.  For
+   example:
+\begin{verbatim}
+gobnilp data.txt
+\end{verbatim}
+   will cause \gobnilp\ to attempt to read the file \texttt{data.txt} as a local score file.
+\end{enumerate}
+
+\subsection{Sensitivity to precision}
+\label{sec:precision}
+
+\gobnilp's performance is sensitive to the precision for local
+scores. Removing a few decimal places can cause large variations in
+solving time (and of course the score of the optimal BN!). For this
+reason learning directly from local scores can give different
+behaviour to learning from data, even when the `same' local scores are
+being produced internally by the scoring algorithm.
+
+% \item \texttt{gobnilp/outputfile/cip} is used to output the problem
+%   that was solved in \scip's CIP format.  This may be useful for
+%   checking exactly what constraints were active.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Effecting structural constraints}
+\label{sec:structure}
+
+\subsection{Simple global structural constraints}
+\label{sec:global}
+
+The most important constraint is the limit on the size of parent
+sets. The default value of 3 can be altered by setting the
+\texttt{gobnilp/scoring/palim} parameter to the desired limit. If set
+to \texttt{-1}, parent sets of all sizes will be considered.  Setting
+\texttt{gobnilp/scoring/palim} to a high value will typically lead to
+very slow solving and/or a crash due to the generation of many candidate parent sets
+unless there are few (e.g.\ $\approx 12$) variables in the data. However, this is not
+always the case, so it is best to experiment: setting
+\texttt{gobnilp/scoring/palim} to your preferred value to begin with
+and then compromising with a lower value if that proves to be
+necessary.  (When learning from a file of local scores
+\texttt{gobnilp/scoring/palim} has no effect, since the set of all
+potential parent sets has already been decided.)
+
+One of the advantages of the `declarative' approach to structure
+learning is that many constraints on DAG structure are easy to
+implement. \gobnilp{} provides a number of simple global constraints
+on DAG structure. \texttt{gobnilp/minedges} and
+\texttt{gobnilp/maxedges} allow the user to express lower and upper
+bounds (respectively) on the number of edges in permissible BNs. Set
+\texttt{gobnilp/maxedges} to -1 to have no upper bound. Similarly,
+\texttt{gobnilp/minfounders} and \texttt{gobnilp/maxfounders} provide
+lower and upper bounds on the number of founders (vertices with no
+parents) in a permissible BN. Again, set \texttt{gobnilp/maxfounders}
+to -1 to have no upper bound. \textbf{Setting
+  \texttt{gobnilp/minfounders} to a high value speeds up solving
+  considerably.} So if you know (or are prepared to assume) a lower
+bound on the number of founders be sure to use this parameter.
+
+Setting \texttt{gobnilp/noimmoralities} to TRUE rules out any BN with
+an immorality. Doing so will thus ensure that any learnt BN is
+equivalent to a decomposable undirected model, however if you want to
+learn a decomposable model, and your score function is
+likelihood-equivalent, then it is better to set
+\texttt{gobnilp/decomposable} to TRUE. Doing so rules out immoralities
+and also (admissibly) fixes an arbitrary variable to be an orphan,
+thus providing a modest speed-up.
+
+A related global constraint is \texttt{gobnilp/orderedcoveredarcs}:
+setting this to TRUE will rule out \emph{covered} directed edges from
+a lower indexed to a higher indexed vertex (when learning from data a
+vertex's index is given by its column in the data, not its name).
+This will reduce the number of Markov equivalent BNs, which may be
+useful when doing repeated searches, but does not affect the score of
+an optimal BN (since each Markov equivalent class still has at least
+one representative with this constraint imposed). See, for example,
+\cite{koller09:_probab_graph_model} for further details on covered
+edges.
+
+It is also possible to put bounds on the number of parent vertices in
+the BN. A vertex is a parent if it has at least one child. Use
+\texttt{gobnilp/minparents} to set a lower bound and
+\texttt{gobnilp/maxparents} for an upper bound, where as usual, a
+value of -1 declares that there is no upper bound (the
+default). Unlike other simple global constraints setting either
+\texttt{gobnilp/minparents} or \texttt{gobnilp/maxparents} to
+non-default values creates auxiliary variables internally: there is an
+indicator variable for each BN vertex being a parent. This means that
+the `sink' heuristic will not work unless it is allowed to use
+`probing'. See Section~\ref{sec:sinks} for further details.
+
+\subsection{Simple local structural constraints}
+\label{sec:local}
+
+The user can also declare specific constraints on edges and
+immoralities by placing them in a file and setting the parameter
+\texttt{gobnilp/dagconstraintsfile} to a string which is the file's
+name. (If the string is empty, \gobnilp{} does not look for such a
+file.)
+
+The file \texttt{example.constraints} in the \gobnilp{} distribution
+demonstrates the correct format for declaring these local
+constraints. The file \texttt{example.constraints} will work with the
+datafile \texttt{data/asia\_100.dat} (note that some of constraints
+have been commented out, they are just there so you can see the format).
+Each line in the file is either a comment starting with
+\# or a constraint. Blank lines are not permitted. \verb+x-y+ states
+that there must be an edge between $x$ and $y$ in the undirected
+skeleton. \verb+x<-y+ states that $y$ must be a parent of
+$x$. \verb+x->z<-y+ states that $x$ and $y$ must be unconnected
+parents of $z$ (an immorality). The negations of any of these
+constraints are possible by prefixing them with the character
+\verb+~+.
+
+
+\subsection{Arbitrary conditional independence constraints}
+\label{sec:ci}
+
+\gobnilp{} allows the user to put arbitrary conditional independence
+constraints on DAGs. This is done by adding such constraints to the
+file specified by \texttt{gobnilp/dagconstraintsfile}. The file
+\texttt{example.constraints} in the \gobnilp{} distribution
+demonstrates the correct format for declaring these constraints. This
+format is either:
+\begin{verbatim}
+<<A>> _|_ <<B>>
+\end{verbatim}
+for independence constraints or
+\begin{verbatim}
+<<A>> _|_ <<B>> | <<S>>
+\end{verbatim}
+for conditional independence constraints, where \verb+<<A>>+, \verb+<<B>>+
+and \verb+<<S>>+ are comma-separated lists of variable names (or
+variable numbers if variable names are not being used). Note that
+(conditional) independence constraints cannot currently be negated.
+
+\gobnilp{} has a separator (cutting plane generator) for conditional
+independence constraints. Let $V$ be the set of all BN variables. If
+$A \perp B | S$, $a\in A$, $b \in B$ and
+$\{a,b\} \subseteq C \subseteq V \setminus S$ then there must be at
+least two elements of $C$ with no parents in $C$, since otherwise $a$
+and $b$ are d-connected. \gobnilp{} searches for (useful) linear
+inequalities representing this observation. It does so by adapting the
+separator for ruling out cycles.
+
+\subsection{Arbitrary \scip{} constraints}
+\label{sec:scipcons}
+
+As described in Section~\ref{sec:cip} \gobnilp{} can read a
+description of a BN learning problem using \scip's CIP
+format. Typically you would use \gobnilp{} to generate such
+a file from data or local scores. It is possible to edit such a file
+to add in additional constraints. Any constraint understood by \scip{}
+is OK including, of course, linear constraints. See the \scip{}
+documentation for a list of available constraints and how they are
+represented in the CIP format.
+
+Note that it is also possible to use the CIP format to define extra
+variables with whatever objective coefficient you like. This would be
+an easy way to add prior terms to the objective function.
+
+\section{Vanilla BN learning}
+\label{sec:vanilla}
+
+Since the user may choose to put all sorts of constraints on the
+learned Bayesian network, \gobnilp{} (unlike some other BN learning
+systems) cannot normally take advantage of certain properties of
+unconstrained optimal Bayesian networks. For example, with no
+constraints it is the case that in an optimal BN, for each node the
+highest scoring parent set will be selected which is consistent with a
+topological ordering of the nodes.
+
+To allow \gobnilp{} to take advantage of such facts, the user can
+choose to set the parameter \texttt{gobnilp/vanilla} to
+\texttt{TRUE}. (Doing this when there \emph{are} constraints is a
+mistake, you may not get an optimal network.) If
+\texttt{gobnilp/vanilla = TRUE} the following happens:
+\begin{enumerate}
+\item For each node, if none of the parents in its `best' available
+  parent set can be descendants of the node (all are \emph{allowed}),
+  then this parent set is selected.
+\item For each node, if a parent set differs from a `better' one only
+  by having \emph{allowed} parents removed, then that parent set is
+  ruled out.
+\end{enumerate}
+Although \texttt{gobnilp/vanilla = TRUE} allows propagations that are
+normally not allowed, we have not observed any performance benefit on
+our test instances---but feel free to see if this setting helps on
+your problem.
+
+\section{Distinguished representative constraint}
+\label{sec:prefrep}
+
+If \texttt{gobnilp/distinguishedrep = TRUE} then \gobnilp will only
+allow DAGs which are the \emph{distinguished representative} of
+their Markov equivalence class. 
+The algorithm for deciding whether a
+DAG is a distinguished representative is as follows.
+
+\begin{algorithmic}
+\Require $G$: DAG
+\State $V \gets$ set of vertices of $G$
+\State ${\cal C} \gets \{ \{v\} \cup \mathrm{Pa}_{G}(v) : v \in V\}$
+\State ${\cal E} \gets \{ \{v,w\} \in V \times V : v \in
+\mathrm{Pa}_{G}(w) \vee w \in
+\mathrm{Pa}_{G}(v) \}$
+\ForAll{$S \in {\cal C}$}
+\Comment{Remove non-maximal members of ${\cal C}$}
+\If{$\exists T \in {\cal C}, T \neq S \mbox{ s.t. } S \subset T$}
+\State ${\cal C} \gets {\cal C} \setminus \{S\}$
+\EndIf 
+\EndFor
+\While{${\cal C} \neq \emptyset$}
+\ForAll{$S \in {\cal C}$}
+\State $S' \gets S \setminus \bigcup_{T \neq S, T \in {\cal C}} T$ 
+\Comment{ Vertices in $S'$ only appear in $S$}
+\State $S'' \gets \emptyset$
+\ForAll{$v \in S'$}
+\If{ $\mathrm{ne}_{G}(v) \subseteq S'$ }
+\State $S'' \gets S'' \cup \{v\}$
+\EndIf
+\EndFor
+\If{$S' \neq \emptyset$}
+\If{$\exists v : S' = \{v\}$}
+\State Set $v$ as a sink and remove $S$
+\Else
+\EndIf
+\EndIf
+\EndFor
+\EndWhile
+\end{algorithmic}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Advanced usage}
+
+In this chapter more advanced usage of \gobnilp{} is considered. This
+is done by setting \gobnilp{} or \scip{} parameters to non-default values.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Controlling the AD tree and caching}
+\label{sec:adtree}
+
+\gobnilp{} an input dataset is internally stored in an AD tree
+using almost exactly the approach given by Moore and Lee
+\cite{moore98:_cached_suffic_statis_effic_machin}. \gobnilp's default
+parameter settings for the AD tree are an attempt to guard against
+running out of memory (by building too big a tree) and delivering fast
+production of BDeu `local scores'. \gobnilp{} also caches marginal
+likelihood values for subsets of variables. Here are the parameters
+related to the AD tree and to caching:
+
+\begin{verbatim}
+# minimum number of datapoints to create a branch in the AD tree
+# [type: int, range: [0,2147483647], default: 2000]
+gobnilp/scoring/rmin = 2000
+
+# limit on the depth of the AD tree
+# [type: int, range: [0,2147483647], default: 1000]
+gobnilp/scoring/adtreedepthlim = 1000
+
+# limit on the number of nodes in  the AD tree
+# [type: int, range: [0,2147483647], default: 10000]
+gobnilp/scoring/adtreenodeslim = 10000
+
+# limit on number of scores that are cached
+# [type: int, range: [0,2147483647], default: 10000000]
+gobnilp/scoring/cachesizelimit = 10000000
+
+# how much to increase the cache when needed and allowed
+# [type: int, range: [0,2147483647], default: 10000]
+gobnilp/scoring/cacheblocksize = 10000
+
+# subsets must have size below this to be cached
+# [type: int, range: [0,2147483647], default: 50]
+gobnilp/scoring/nvarscachelimit = 50
+\end{verbatim}
+
+If you have a machine with lots of memory then you may wish to
+alter the values of some of these parameters---in particular reducing
+\verb+gobnilp/scoring/rmin+ will typically improve performance. If you
+are running out of memory then moving values in the other direction
+will help you.
+
+\section{Altering the search strategy}
+\label{sec:search}
+
+\subsection{Altering \scip{} parameter values}
+\label{sec:scipparams}
+
+Since \gobnilp{} is a \scip{} \cite{achterberg07:_const_integ_progr}
+project \scip{} parameters can be altered to affect the way \gobnilp{}
+behaves. By default, \gobnilp{} sets a number of \scip{} parameters to
+non-default values, though these can be over-ridden by use of a settings
+file. An exhaustive search for the best possible setting of \scip{}
+parameters has \emph{not} been conducted; the \scip{} parameter settings
+used by default by \gobnilp\ effect a general strategy of
+turning off all but the fastest \scip{} heuristics and most \scip{}
+cutting plane algorithms. If you find better \scip{} parameter
+settings let us know!
+
+\scip{} gives you much control over the search: you can switch from
+\scip's default search strategy to best-first search or depth-first
+for example. You can decide how many cuts to add, how often to look
+for cuts and how efficacious a cut must be to be added. You can choose
+to run any number of \scip's builtin \emph{primal heuristics} to look
+for solutions. Read the \scip{} documentation for further details.
+
+\subsection{Controlling the sink-finding primal heuristic}
+\label{sec:sinks}
+
+The sink-finding primal heuristic uses the current LP solution to
+search for a high-scoring DAG. Finding such DAGs should speed up
+solving times and provides better anytime behaviour.
+This heuristic (described in
+\cite{bartlett13:_advan_bayes_networ_learn_integ_progr}) has all the
+parameters that any other \scip{} heuristic has. For example, setting
+\begin{verbatim}
+heuristics/sinks/freq = -1
+\end{verbatim}
+turns off this heuristic.
+The heuristic has two modes: non-probing (the default) and
+probing. Probing mode does a bit more work to set any auxiliary
+variables to (hopefully) feasible values. So if you are using any
+auxiliary variables, either explicitly %(see Section~\ref{sec:auxiliary})
+or implicitly since you are putting bounds on the number of parents
+(see Section~\ref{sec:global}), you should turn probing mode on.
+Do this by adding the following line to your parameter file (usually
+\texttt{gobnilp.set})
+\begin{verbatim}
+heuristics/sinks/probing = TRUE
+\end{verbatim}
+By default probing mode does a search of maximal depth 100. This can
+be altered using the parameter \texttt{heuristics/sinks/maxdivedepth}.
+
+The heuristic typically makes a number of tie-breaking random
+choices. You can set the random seed for such choices by setting
+\verb+heuristics/sinks/seed+. Choosing different random seeds is an
+easy way to measure how sensitive the performance of \gobnilp{} is to
+such arbitrary decisions. The parameter \verb+heuristics/sinks/nruns+
+controls how often the heuristic runs for each LP solution. Due to the
+just mentioned random tie-breaking choices, one may find better
+heuristic solutions by raising this parameter from its default value
+of 1.
+
+You have the option of getting hold of \emph{every} primal solution
+(i.e.\ BN) proposed by this heuristic. Since this heuristic is called
+each time a linear relaxation is solved there are very many of these,
+and the same BN may be proposed many times. However, this is a
+convenient way of collecting a large number of reasonably high-scoring
+BNs. To enable this behaviour set \texttt{heuristics/sinks/printsols}
+to TRUE. By default all the BNs will be sent to standard output. To
+have them put in a file instead set \texttt{heuristics/sinks/filesols}
+to the name of the file. Note that the solutions are output in \scip's
+internal solution format.
+
+\begin{description}
+\item[heuristics/sinks/printsols]
+\
+\begin{verbatim}
+# whether to print *every* BN found by sink heuristic (in SCIP solution format)
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+heuristics/sinks/printsols = FALSE
+\end{verbatim}
+
+\item[heuristics/sinks/filesols]
+\
+\begin{verbatim}
+# where to print solutions found by sink heuristic
+# [type: string, default: ""]
+heuristics/sinks/filesols = ""
+\end{verbatim}
+\end{description}
+
+%\subsection{Altering \gobnilp{} parameter values}
+%\label{sec:gobnilpparams}
+
+\subsection{DAG cluster constraint  parameters}
+
+The dagcluster constraint handler has all the parameters that any other \scip{}
+constraint handler has. For example, setting
+\begin{verbatim}
+constraints/dagcluster/sepafreq = -1
+\end{verbatim}
+turns off the constraint handler's separation routine.
+You can also effect which cutting planes \gobnilp{} looks for. By
+default \gobnilp{} only looks for \emph{1-cluster-based constraints}
+as introduced in
+\cite{jaakkola10:_learn_bayes_networ_struc_lp_relax}. By increasing
+the value of \texttt{constraints/dagcluster/kmax} from its default
+value of 1 you can ask \gobnilp{} to additionally look for
+\emph{k-cluster-based constraints}
+\cite{cussens11:_bayes_networ_learn_cuttin_planes} for $1 < k <
+\mbox{kmax}$. If you just want to effect such a change just in the root
+node of the search tree use \texttt{constraints/dagcluster/kmaxroot}.
+\begin{description}
+\item[constraints/dagcluster/kmax]
+\
+\begin{verbatim}
+# maximum k to try for k-cluster cutting planes
+# [type: int, range: [1,2147483647], default: 1]
+constraints/dagcluster/kmax = 1
+\end{verbatim}
+
+\item[constraints/dagcluster/kmaxroot]
+\
+\begin{verbatim}
+# maximum k to try for k-cluster cutting planes in the root
+# [type: int, range: [1,2147483647], default: 1]
+constraints/dagcluster/kmaxroot = 1
+\end{verbatim}
+
+The dagcluster constraint has very many other parameters. These will
+be described in the next version of this manual.
+
+
+\end{description}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Choosing a BDeu score}
+\label{sec:scoreparam}
+
+The BDeu score depends on a single parameter, the \emph{effective
+  sample size}.  By default, this is set to 1, though it can be
+changed with a parameter as explained below.
+The speed of scoring depends on the size of the input, where this size
+is determined by the number of variables and datapoints. But the limit
+on parent set size is the most important parameter. The scoring code
+can deal with datasets with many variables (in the hundreds) if the
+limit on parent sets is set low. To get an idea of how quickly it can
+deal (or not!) with various sorts of inputs please refer to the
+benchmarks on \url{http://www.cs.york.ac.uk/aig/sw/gobnilp}. (Or just
+experiment yourself.)
+
+By default \gobnilp{} uses C's \texttt{lgamma} function to compute
+BDeu scores. Values such as $\log \Gamma(\alpha + n) - \log
+\Gamma(\alpha)$ are computed, where $\alpha$ is the effective sample
+size and $n$ is some count coming from the data. For very large values
+of $\alpha$ the \texttt{lgamma} function has numerical problems. For
+example, \verb/lgamma(1e20+1) - lgamma(1e20)/ will be computed as
+0. To avoid this problem \gobnilp{} can compute $\log \Gamma(\alpha +
+n) - \log \Gamma(\alpha)$ as the sum $\sum_{i=0}^{n-1} \log
+(\alpha+i)$ which is more numerically stable, but slower to
+compute. To use this safer option set \verb+gobnilp/scoring/fast+ to
+\texttt{FALSE}. This is only necessary for very large values of $\alpha$.
+
+The scoring algorithm works by computing parent set scores for each
+child variable independently. (Presumably one could thus parallelise
+it without too much work.) Parent sets are generated in layers, where
+each parent set in a layer has the same cardinality. Layers are
+generated in increasing cardinality. Parent sets (for a given child)
+which cannot exist in an optimal BN are not saved. \textbf{This means
+  that parentset-child combinations for a second-best BN may be
+  missing.} The algorithm uses a slightly modified version of the
+pruning approach devised by de Campos and Ji
+\cite{campos10:_proper_bayes_diric_scores_learn}. See
+Appendix~\ref{sec:pruning} for a proof of the correctness of the
+implemented pruning method.  If you need scores for parentset-child
+combinations which will never appear in the most likely BN, (for
+example, if you are computing the $k$ best BNs) then pruning can be
+turned off using the appropriate parameter. Note that if you are
+learning a decomposable model from data then pruning should be turned
+off since such a constraint makes \gobnilp{}'s pruning algorithm
+inadmissible. (All optimal decomposable models may be pruned away.)
+
+% The scores produced by the scorer are controlled by a further three
+% parameters.  \texttt{gobnilp/scoring/alpha} sets the equivalent sample
+% size parameter for the BDeu scores.   Finally, \texttt{gobnilp/scoring/prune} can be used to
+% set whether parent sets that cannot possibly appear in the best BN are
+% removed from the problem.
+
+There now follows a list of parameters affecting scoring. We have
+added parameters which concern the format of the data file from which
+scores would be generated.
+
+\begin{description}
+\item[gobnilp/mergedelimiters]
+\
+\begin{verbatim}
+# whether to treat consecutive delimitors in the input file as one
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/mergedelimiters = TRUE
+\end{verbatim}
+
+\item[gobnilp/delimiter]
+\
+\begin{verbatim}
+# the delimiter for fields in the input file (special values - whitespace, tab)
+# [type: string, default: "whitespace"]
+gobnilp/delimiter = "whitespace"
+\end{verbatim}
+
+\item[gobnilp/scoring/alpha]
+\
+\begin{verbatim}
+# alpha value for use in BDeu scoring
+# [type: real, range: [0,3.4E38], default: 1]
+gobnilp/scoring/alpha = 1
+\end{verbatim}
+
+\item[gobnilp/scoring/arities]
+\
+\begin{verbatim}
+# whether variable arities are given in the data file
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/arities = TRUE
+\end{verbatim}
+
+\item[gobnilp/scoring/names]
+\
+\begin{verbatim}
+# whether variable names are given in the data file
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/names = TRUE
+\end{verbatim}
+
+\item[gobnilp/scoring/palim]
+\
+\begin{verbatim}
+# maximum number of parents for each node (-1 for no limit)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/scoring/palim = -1
+\end{verbatim}
+
+\item[gobnilp/scoring/prune]
+\
+\begin{verbatim}
+# whether to prune during scoring
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/prune = TRUE
+\end{verbatim}
+\end{description}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Collecting and analysing information on the search }
+\label{sec:analysis}
+
+By default, \gobnilp{} produces little information about how the search
+is progressing beyond the score of the current best solution and the
+upper bound on the best possible solution that may exist.  Additional
+information can be obtained by changing the verbosity level of the
+program, either through the \verb+-v+ commandline argument or the
+\scip{} parameter \verb+display/verblevel+.
+
+Setting verbosity to 4 will produce significantly more information about
+the progress of the search, such as the number of variables and rows
+active at the current stage in the solving.  Please refer to the \scip\
+documentation for full information on the output produced.
+
+Even greater information can be obtained by setting verbosity to 5.
+With this setting, \gobnilp\ will produce an initial listing of
+parameters not set to their default value.  If you're playing with
+different parameter settings this is a good way to keep track of how
+different parameter settings perform.  In addition, after the search
+finishes, \scip\ will output information on how often various routines
+are called and how long they took. You will see that, typically, most of
+the time is spent in the separation routine of the \texttt{dagcluster}
+constraint (i.e.\ most of the time is spent looking for cutting planes).
+Finally, at verbosity level 5, you will get information on the search
+tree, in particular information on variables that were branched upon.
+
+Columns in the output which display information such as the number of
+cuts are by default suppressed if verbosity is below 4. To change this
+behaviour set the parameter \verb+gobnilp/verblevelsetscols+ to \texttt{FALSE}.
+
+\subsection{Profiling}
+\label{sec:profiling}
+
+For lower-level profiling of \gobnilp{} you need to make both \scip{} and \gobnilp{}
+with \verb+OPT=prf+. If you have \cplex:
+\begin{verbatim}
+make LPS=cpx OPT=prf
+\end{verbatim}
+otherwise
+\begin{verbatim}
+make OPT=prf
+\end{verbatim}
+This will create a new executable in your bin directory and
+make a symbolic link to it called \texttt{gobnilp}. Running this
+executable on a BN learning instance will create a file called
+\texttt{gmon.out}. A profile of that run is then available with:
+\begin{verbatim}
+gprof bin/gobnilp
+\end{verbatim}
+
+
+
+\subsection{Using \vbctool}
+\label{sec:vbctool}
+
+You are encouraged to download and install \vbctool, which is
+available from:
+\url{http://www.informatik.uni-koeln.de/ls_juenger/research/vbctool/}. This
+will allow you to see the search tree and extract useful information
+from nodes such as bounds and which variable was branched on. You may
+have to build \vbctool{} from source.
+
+
+To have \gobnilp{} generate the required information, it is enough to
+set the \scip{} parameter \texttt{visual/vbcfilename} to a string specifying
+a filename. Just have a line like:
+\begin{verbatim}
+visual/vbcfilename = "foo"
+\end{verbatim}
+in your \gobnilp{} parameter file (which is typically
+\texttt{gobnilp.set}). (In older versions of \scip{}, this parameter
+was called \texttt{vbc/filename}.) Let's assume that you did use \verb+"foo"+ as
+your file name.
+
+Once \gobnilp{} has stopped (and it's OK to stop it with a CTRL-C)
+start \vbctool{} (with no command line arguments). Use
+\verb+File->Load+ to load \texttt{foo}. Now do
+\verb+Emulation->Start Emulation+.
+This will grow the search tree that \gobnilp{} used when
+running whichever BN learning problem generated \texttt{foo}. By
+default this will grow the tree at the same speed at which \gobnilp{}
+originally built it. If this is too slow for you, you can speed it up
+using the  \verb+Emulation->Setup...+ menu. Setting \texttt{Seconds}
+to e.g.\ 10, will ensure that the entire simulation takes 10 seconds.
+
+You will see that different nodes have different colours. For a full
+explanation of these colours consult \verb+type_vbc.h+ in the \scip{}
+source directory. Red nodes are cut-off nodes---where \gobnilp{}
+pruned the search. Light grey (which look almost white) nodes are
+unsolved nodes. Basically red is good and light grey is bad.
+
+By right-clicking on a node you get information about that node. (You
+may need to expand the information panel to see all of this
+information.) In particular you get to see the branching variable (and
+its branching value) that was branched on to create the node. You also
+get to see the dual bound (although the negative sign will be omitted).
+
+You can print out the search tree using
+\verb+File->Print+
+
+
+
+% \section{Using auxiliary variables}
+% \label{sec:auxiliary}
+
+% \subsection{Layer variables}
+% \label{sec:layers}
+
+% \subsection{Total order variables}
+% \label{sec:totalorder}
+
+% \subsection{Total order position indicator variables}
+% \label{sec:indposvars}
+
+% \subsection{Imset variables}
+% \label{sec:imsetvars}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Defining a BN learning problem using the CIP format }
+\label{sec:cip}
+
+\gobnilp\ is capable of reading in and solving problems stored in
+\scip 's CIP format.  This is specified through the
+command line argument of \texttt{-f=cip} or giving the input file a
+\texttt{.cip} filename extension.
+
+Unlike the other input formats, a CIP file contains the ILP
+problem (objective function, variables and constraints) and not just
+the data (or scores) to construct it.  It is not intended that users will create
+their own CIP files as input, instead \gobnilp{} can be used to create
+an initial CIP file which can then be edited.
+Details on how to get \gobnilp\ to produce a CIP file as output are
+given in Chapter~\ref{chap:xflag}.
+Please see the \scip\ documentation for a full explanation of the CIP
+format.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Advanced output options}
+\label{sec:advancedoutput}
+
+
+When an optimal BN is found you have the option of additionally
+printing out the solution in \scip's internal format by setting
+\texttt{gobnilp/printscipsol} to TRUE.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Troubleshooting / Howtos}
+\label{chap:troubleshooting}
+
+
+\begin{enumerate}
+\item 
+\textit{\gobnilp{} is very slow. How can I speed it up?}  You may not
+be able to for your particular problem, but here are some things to
+try.
+\begin{itemize}
+\item If you have \cplex{} installed be sure to make \gobnilp{} using
+  \texttt{make LPS=cpx}. This will ensure that \cplex{} is used to solve
+  the many linear relaxations that are generated by \gobnilp{}
+\item You can, of course, compromise and solve an easier problem. For
+  example, you can give up on getting an optimal solution by setting
+  \scip's \texttt{limits/time} and \texttt{limits/gap}
+  appropriately. Alternatively, you can reduce the limit on the number
+  of parents allowed in a parent set via the \gobnilp{} parameter
+  \texttt{gobnilp/scoring/palim}. Setting \texttt{gobnilp/minfounders}
+  and \texttt{gobnilp/edge\_penalty} to large values also speeds up
+  solving.
+\item You can try non-default parameter settings for
+  \gobnilp. \gobnilp's most important decision is when to stop adding
+  cutting planes in the root node and to start
+  branch-and-bound. \gobnilp{} can guess wrong on this: either adding
+  cuts when it should be branching on variables, or stopping cut
+  generation too early and thus failing to generate a crucial cut. The
+  following parameters (given with \gobnilp's default values) affect
+  this decision:
+  \begin{itemize}
+  \item \texttt{separating/maxstallrounds = 10}
+  \item \texttt{constraints/dagcluster/forcecuts = TRUE}
+  \item \texttt{constraints/dagcluster/rootgapsepalimit = 0.001}
+  \item \texttt{separating/minefficacyroot = 0.0005}
+  \item \texttt{separating/maxcutsroot = 300}
+  \end{itemize}
+  You can also reduce the time spent on looking for `cluster' cuts
+  (whether in the root or elsewhere in the search tree) via
+  the following paramters:
+  \begin{itemize}
+  \item \texttt{constraints/dagcluster/sepafreq = 10}
+  \item \texttt{constraints/dagcluster/consenfolpsubiptimelimit = 20}
+  \item \texttt{constraints/dagcluster/conssepalpsubiptimelimit = 10}
+  \item \texttt{constraints/dagcluster/conssepasolsubiptimelimit = 10}
+  \end{itemize}
+  \gobnilp{} uses \scip's default approach to choosing which variable
+  to branch on:  \emph{reliability branching on pseudo cost values}
+  (\texttt{relpscost}) but we use non-default values:
+  \begin{itemize}
+  \item \texttt{branching/relpscost/inferenceweight = 0.1}
+  \item \texttt{branching/relpscost/maxlookahead = 1}
+  \end{itemize}
+  You may get better performance by putting these back to \scip's
+  default values.
+\end{itemize}
+    
+\item \textit{The local BDeu scores that \gobnilp{} produces seem wrong---some
+  are even positive!}
+This may be due to numerical problems, perhaps due to a very
+    high value for the \emph{effective
+    sample size} ( set via \verb+gobnilp/scoring/alpha+ ). Try setting
+\verb+gobnilp/scoring/fast+ to \texttt{FALSE}.
+
+\item \textit{I want to bias \gobnilp{} towards sparse graphs. How do I do
+  this?} Set \verb+gobnilp/edge_penalty+ to a positive value. 
+
+\item \textit{\gobnilp{} is failing to find any solution---let alone an
+  optimal one!} Try setting \texttt{heuristics/sinks/probing} to
+\texttt{TRUE}. You may also need to increase \texttt{heuristics/sinks/maxdivedepth}.
+
+\item \textit{When I run gobnilp I get ``No arguments given, assuming
+    doing 'make test' ``}
+  In this situation you should see this output:
+\begin{verbatim}
+No arguments given, assuming doing 'make test'
+Looking for 'load <<settings_filename>> on standard input'
+\end{verbatim}
+  As the output states you have called \gobnilp{} without any command
+  line arguments. This only makes sense when \gobnilp{} is being
+  called by \scip 's testing routines via a \texttt{make test}
+  command. See Chapter~\ref{chap:tests} for more on how to test
+  \gobnilp{} using \texttt{make test}.
+\end{enumerate}
+
+\chapter{Running tests}
+\label{chap:tests}
+
+\gobnilp{} can use \scip 's test framework for running tests. A test
+has three components:
+\begin{enumerate}
+\item a test file listing a set of problem instances,
+\item a settings file and
+\item (optionally) a solutions file listing solutions to the problem instances 
+\end{enumerate}
+
+Test files and the optional solution files should be placed in
+\verb+$(GOBNILPDIR)/check/testset+. Settings file should be placed in
+\verb+$(GOBNILPDIR)/settings+. \verb+$(GOBNILPDIR)+ is the directory
+containing \gobnilp 's Makefile. The \gobnilp{} execcutable being
+tested should be \verb+$(GOBNILPDIR)/bin/gobnilp+.
+
+The basic (command line) command for running tests is \texttt{make
+  test} which must be run from \verb+$(GOBNILPDIR)+. If you are using
+CPLEX as the LP solver for \gobnilp{} you should do \texttt{make test
+  LPS=cpx} instead. The default test  is \texttt{short} and the
+default settings are \texttt{default} so \texttt{make test} is
+equivalent to:
+\begin{verbatim}
+make test TEST=short SETTINGS=default
+\end{verbatim}
+which will use the file \verb+$(GOBNILPDIR)/check/testset/short.test+
+for the problem instances, the file
+\verb+$(GOBNILPDIR)/check/testset/short.solu+
+for the solutions (optimal objective values) for each problem instance
+and \verb+$(GOBNILPDIR)/settings/default.set+ (an empty file) for the settings.
+
+Running a test sends the results of the test to standard output (e.g.\
+your terminal window) but also creates files storing the test
+results. These files will be in
+\verb+$(GOBNILPDIR)/check/results+. You will find 7 files for the test
+as a whole of the form \verb+<<long>>.suf+ where \verb+<<long>>+ is a long
+string, something like
+\begin{verbatim}
+check.short.gobnilp.linux.x86_64.gnu.opt.cpx.james-PORTEGE-Z30-A.default
+\end{verbatim}
+and \verb+suf+ is a suffix indicating the type of file, as follows:
+
+\begin{itemize}
+\item \verb+<<long>>.err+ What was sent to standard error during the test
+\item \verb+<<long>>.eval+ List of files containing results for
+  individual problem instances
+\item \verb+<<long>>.meta+ Information on the test run, e.g.\ memory
+  limit, name of test, random seed used, etc.
+\item \verb+<<long>>.out+ What was sent to standard output during the test
+\item \verb+<<long>>.pav+ CSV formatted summary of test results
+\item \verb+<<long>>.res+ `Pretty' summary of test results
+\item \verb+<<long>>.tex+ A \LaTeX{} document containing a summary of
+  the test results.
+\end{itemize}
+
+You will also find 2 files for each problem instance containing what
+was sent to standard output and what to standard error when solving
+that instance.
+
+\chapter{Exiting without solving}
+\label{chap:xflag}
+
+The command line argument \texttt{-x} causes \gobnilp\ to exit just
+before attempting to find the best BN.
+The primary purpose of this is to enable the ILP model to be created
+and saved to file in CIP format without being solved.  To do this, the parameter
+\texttt{gobnilp/outputfile/cip} should be set to something other than
+\texttt{""} and the program called with the \texttt{-x} argument.  The
+model will be generated as usual, written to the specified location
+and then \gobnilp\ will exit without solving the model.  If the
+parameter \verb+gobnilp/presolvecip+ is set to \texttt{TRUE} then the
+problem instance is presolved before being output. As \gobnilp\
+can read CIP files, the output can subsequently be loaded back into
+\gobnilp\ without the \texttt{-x} argument and the solving can
+proceed.
+
+Writing out the ILP model in this way has several purposes.  First, it
+allows examination of exactly what constraints have been added to the
+model.  Second, the model can be edited, perhaps adding additional
+constraints or to assess sensitivity to a value.  Third, a basic model
+can be saved once and then solved under a variety of parameter
+settings to determine their effect.
+
+Some care must be taken in this final case; the CIP model output will
+contain any additional constraints added to the model (such as those
+in Section~\ref{sec:structure}).  These will not be removed if the
+subsequent reloading and solving of the model takes place using
+parameter settings that say these constraints should not occur.
+Generally speaking, additional limitations on the problem added when
+creating the CIP file will never be removed when that CIP file is
+later used though further, tighter restrictions can be added with
+parameter settings.
+
+Another use of the \texttt{-x} argument is to allow the local BDeu
+scores to be computed and written out, without then proceeding to the
+solving phase.  If data is given as input,
+\texttt{gobnilp/outputfile/scores} can be used to write the local
+scores computed to file.  As computation of local scores can be very
+time consuming, there can be considerable advantage in saving the
+local scores as a \texttt{.jkl} file and restarting any future BN
+learning from that stage.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Learning Pedigrees}
+\label{sec:pedigree}
+
+Pedigrees (or family trees) are a way of recording relationships amongst
+a group of individuals.  It is possible to represent a pedigree as a
+Bayesian network~\cite{lauritzensheehan} and from this to state the
+problem of finding the most likely pedigree as finding a BN with the
+highest score.  See \cite{genepi} for a description of how this can be
+formulated as an ILP problem.
+
+\gobnilp\ provides specialised support for learning pedigrees from
+genetic data.  In order to use any of these additional functions,
+\texttt{gobnilp/pedigreemode} should be set to TRUE.
+\begin{enumerate}
+   \item Sex consistency of the pedigree can be enforced.
+   \item Age information can be used to constrain the learning process.
+   \item Limitations on family sizes can be specified.
+   \item Output can be produced in a format convenient for interchange
+         with other pedigree based programs.
+   \item Genetic profiles can be input and the likelihood scores can be
+         calculated inside \gobnilp .
+\end{enumerate}
+Use of each of these will be now be explained in turn.
+
+Setting the parameter \texttt{gobnilp/pedigree/sexconsistent} to TRUE
+will enforce sexual consistency in the pedigree, i.e.\ for all found
+networks, it will be possible to assign sexes to the individuals in some
+way such that all individuals can be labelled male or female and no two
+individuals of the same sex have a child together.  There may be several
+ways of labelling of a pedigree such that it is sex consistent, but if
+\gobnilp\ is used to find multiple pedigrees, only one such pedigree
+will be returned: each pedigree found will have some structural
+differences from the others, not just a relabelling of sexes.
+
+If the ages of individuals are known, \gobnilp\ allows this information
+to be utilised to restrict the pedigree learned.  Specifically, sets of
+siblings and sets of half-siblings can both be limited to only those
+with a maximum age gap between them.  If
+\texttt{gobnilp/pedigree/maxsibagegap} is set then it will ensure that
+for all generated sibsets, the age difference between the youngest and
+oldest sibling does not exceed the age gap given.
+\texttt{gobnilp/pedigree/maxhalfsibagegap} works similarly except for
+enforcing the constraint on sets of half-siblings who have a common
+mother.  In order to use these functions, age information must first be
+supplied.  How this can be done is explained when discussing input
+below.
+
+In addition to limiting sibsets by age difference, \gobnilp\ also allows
+them to be limited by size.  \texttt{gobnilp/pedigree/maxsibsetsize} can
+be used to limit the maximum number of children that a pair of
+individuals have together, i.e.\ the maximum number of full siblings in
+a family.  It is also possible to limit the number of children that any
+one individual can have with all its mates.  This is specified using
+\texttt{gobnilp/pedigree/maxchildren}.  As male and female mating
+reproductive behaviour may vary considerably, the maximum number of
+children allowed ca be specified independently for males and females.
+The parameters \texttt{gobnilp/pedigree/maxchildrenfather} and\\
+\texttt{gobnilp/pedigree/maxchildrenmother} allow these values to be
+given respectively.  In the case that both a limit on the number of
+children for all individuals and a limit specific to a sex are given,
+the lower of the two numbers is enforced.
+
+Output of the found BN from \gobnilp\ can be in a convenient pedigree
+format.  This is controlled through the
+\texttt{gobnilp/outputfile/pedigree} parameter, see
+section~\ref{sec:output} for a description of how to use this parameter.
+The output pedigree has one line per individual with each line having
+four tab separated fields.  The first field is the individual that the
+line refers to.  The second field is the sex of the individual.  If
+\texttt{gobnilp/pedigree/sexconsistent = FALSE} in the settings file,
+then all individuals will have a sex of U for unknown, otherwise this
+will be either M (male) or F (female).  Finally, the last two fields
+record the father and mother of the individual respectively.  All nodes
+labelled as male can only appear in the father field and similarly all
+females can only appear as mothers.  If a node has one or more parents
+who are not in the sample, these are shown as a ``--'' in the
+appropriate field.  The pedigree is always arranged such that the row
+stating a node's parents always appears before all rows in which that
+node appears as another individual's parent.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Input from genetic profiles}
+
+If log likelihood scores for parentage combinations are known, these can
+be input using the score format as explained in
+Section~\ref{sec:scores}.  However, \gobnilp\ can also compute these
+scores itself from the marker data for the individuals.  The scores
+calculated are on the basis of strict Mendelian inheritance, please
+see~\cite{genepi} for a full explanation of the assumptions behind the
+calculated scores.
+
+The basic format for the marker data file is one row for each
+individual.  Each row should have an equal number of columns, with the
+separator between columns specified using the \texttt{gobnilp/delimiter}
+and \texttt{gobnilp/mergedelimiters} properties as described in
+Section~\ref{sec:datainputformat}.  There may be an additional header
+row containing names of the columns, which is specified using the\\
+\texttt{gobnilp/pedigree/inputfile/columnheaders} parameter.
+
+Columns can contain any data and in any order, making it simple to
+import data from a spreadsheet for example.  The only restriction is
+that the marker data is all in a contiguous block of columns and that
+the two alleles of each marker are in adjacent columns.
+
+In order to tell \gobnilp\ which columns contain the marker data, the
+\texttt{gobnilp/pedigree/inputfile/allelestartcolumn} and\\
+\texttt{gobnilp/pedigree/inputfile/alleleendcolumn} parameters are used.
+For example, a file in which the first 10 columns contain marker data,
+one would set
+\begin{verbatim}
+gobnilp/pedigree/inputfile/allelestartcolumn = 0
+gobnilp/pedigree/inputfile/alleleendcolumn = 9
+\end{verbatim}
+\textbf{Note that column numbers start from 0.}
+
+In addition to the marker data for individuals, it is possible to give
+individuals' names, ages and sexes.  This information will be used to
+limit which individuals can be parents of other individuals.  Each of
+these forms of information is also given by specifying a column number,
+using the parameters \texttt{gobnilp/pedigree/inputfile/namecolumn},\\
+\texttt{gobnilp/pedigree/inputfile/agecolumn} and\\
+\texttt{gobnilp/pedigree/inputfile/sexcolumn}.  Names can be any value.
+Ages must be integers.  Sexes can be any value, but any value beginning
+with a \texttt{F} will be interpreted as female, any value beginning
+with a \texttt{M} as male, and anything else as unknown.
+
+If exact ages are not known, but it is known whether each individual is
+an adult or a juvenile, then the parameter\\
+\texttt{gobnilp/pedigree/inputfile/adultcolumn} can be used.  Each
+individual which is an adult should be given a \texttt{TRUE} value, with
+a \texttt{FALSE} value otherwise.
+
+If any of this information is not in the database, or you wish to
+exclude it, then simply set the appropriate parameter to -1 or omit it
+altogether.
+
+As an example of this, consider the following first few lines of a CSV
+style file
+\begin{verbatim}
+Name,Age,Sex,City,CSF1POa,CSF1POb,FGAa,FGAb,TH01a,TH01b,TPOXa,TPOXb
+John,35,Male,London,10,11,20,23,9,11,5,5
+Peter,31,Male,New York,8,11,18,18,8,11,10,11
+Mary,25,Female,Los Angeles,10,11,18,20,9,9,3,11,12
+\end{verbatim}
+
+To read this information in, one would set
+\begin{verbatim}
+gobnilp/delimiter = ","
+gobnilp/mergedelimiters = FALSE
+gobnilp/pedigree/inputfile/columnheaders = TRUE
+gobnilp/pedigree/inputfile/allelestartcolumn = 4
+gobnilp/pedigree/inputfile/alleleendcolumn = 11
+gobnilp/pedigree/inputfile/namecolumn = 0
+gobnilp/pedigree/inputfile/agecolumn = 1
+gobnilp/pedigree/inputfile/sexcolumn = 2
+\end{verbatim}
+
+Once the information has been read in, it is used to compute log
+likelihoods of each possible parentage combination.  In order to do
+this, it is necessary to know the population frequencies for each of the
+alleles of each marker.  If these are not known, then the frequencies
+found in the data file can be used.  However if they are known, they can
+be given using \texttt{-q=}\textit{frequencyfile} from the command
+line.  The frequency file should give the markers in the same order as
+they appear in the main data file.  Each marker should have two rows,
+the first giving the names of the alleles and the second giving the
+frequencies of the alleles.  The separator used should match that given
+for the main file.
+
+An example of the first few column and lines of a frequency file is
+given below.
+\begin{verbatim}
+308,380,339,...
+0.147058823529,0.117647058824,0.0294117647059, ...
+458,468,454,...
+0.229411764706,0.0294117647059,0.158823529412,..
+\end{verbatim}
+
+Finally, it is possible to control which candidate parent sets are
+considered.  The parameter \texttt{gobnilp/pedigree/singleparents} can
+be used to tell \gobnilp\ whether to consider parent sets of size 1,
+i.e.\ where an individual can have one parent who is known and the other
+who is unobserved.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Pedigree parameters}
+
+\begin{description}
+\item[gobnilp/pedigreemode]
+\
+\begin{verbatim}
+# whether to use GOBNILP for pedigrees
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/pedigreemode = FALSE
+
+# whether to enforce sexual consistency in the dag
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/sexconsistent = FALSE
+
+# whether to enforce sexual consistency in the dag
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/pedigree/sexconsistent = FALSE
+
+# maximum age gap permitted between full siblings (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/maxsibagegap = -1
+
+# maximum age gap permitted between half siblings (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/maxhalfsibagegap = -1
+
+# maximum number of children a pair of parents can have together (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/maxsibsetsize = -1
+
+# maximum number of children any individual can have (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/maxchildren = -1
+
+# maximum number of children a mother can have (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/maxchildrenmother = -1
+
+# maximum number of children a father can have (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/maxchildrenfather = -1
+
+# whether the pedigree can feature individuals with only one parent
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/pedigree/singleparents = TRUE
+
+# whether the pedigree input file has column headers
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/pedigree/inputfile/columnheaders = TRUE
+
+# the column with individuals' names (-1 if no such column)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/inputfile/namecolumn = -1
+
+# the column with individuals' sexes (-1 if no such column)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/inputfile/sexcolumn = -1
+
+# the column with individuals' ages (-1 if no such column)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/inputfile/agecolumn = -1
+
+# the first column with individuals' alleles
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/pedigree/inputfile/allelestartcolumn = 0
+
+# the last column with individuals' alleles
+# [type: int, range: [1,2147483647], default: 1]
+gobnilp/pedigree/inputfile/alleleendcolumn = 1
+
+# the column stating which individuals are adults (-1 if no such column)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/pedigree/inputfile/adultcolumn = -1
+
+# the symbol used for unknown genotypes
+# [type: string, default: "NA"]
+gobnilp/pedigree/realdata/unknown = "NA"
+
+# the most genotype mismatches that are allowed between a child and parent
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/pedigree/realdata/maxmismatches = 0
+
+# the value to use for mutation probability
+# [type: real, range: [0,1], default: 0]
+gobnilp/pedigree/realdata/mutationprob = 0
+\end{verbatim}
+\end{description}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Variables (Development Manual)}
+\label{chap:variables}
+
+
+In this (UNFINISHED!) chapter we list the variables that are used by
+\gobnilp. Some variables are always added, some added
+by default and some only added when the user chooses a non-default way
+of running \gobnilp.
+
+\section{Family variables}
+\label{sec:familyvariables}
+
+A family variable $\fv{W}{v}$ is a binary variable. $\fv{W}{v} = 1$ iff
+$W$ is the parent set of $v$. Family variables have (negative)
+objective coefficients which are `local scores'. Local scores are
+either computed from data or supplied a already-computed
+scores. Family variables are always created by \gobnilp.
+
+\subsection{Implementation details}
+\label{sec:fvdetail}
+
+Family variables are currently added to the SCIP instance in the
+function \verb+addParentVariables+ in the file
+\verb+probdata_bn.c+. They are `embedded' in a \verb+ParentSetData+
+struct: if \verb+psd+ is a \verb+ParentSetData+
+struct then the family variables are available via \verb+psd->PaVars+
+which has type \verb+SCIP_VAR***+. \verb+psd->PaVars[i][k]+ is the
+$k$th family variable for BN node $i$. The \verb+ParentSetData+ struct
+containing the family variables is a member of the
+\verb+SCIP_ProbdData+ struct, so family variables are always
+accessible via the main \scip{} instance as follows:
+\begin{verbatim}
+   probdata = SCIPgetProbData(scip);
+   var = probdata->psd->PaVars[i][k];
+\end{verbatim}
+
+\section{Arrow variables}
+\label{sec:arrowvariables}
+
+An arrow variable $I(i\leftarrow j)$ ($i\neq j$) is a binary variable
+indicating there is an arrow from BN node $i$ to BN node $j$. These
+variables have objective coefficient 0. These variables are always
+created.
+
+\subsection{Implementation details}
+\label{sec:arrowvariabledetails}
+
+Arrow variables are added in the function \verb+addArrowVariables+ in 
+\verb+probdata_bn.c+. If there are at least two family variables $\fv{J}{i}$ such
+that $j \in J$ then an arrow variable is created $I(i\leftarrow j)$,
+otherwise not. Arrow variables are stored in a hash table which can be
+accessed as the \texttt{arrow} member of a \verb+ParentSetData+ struct
+and can be accessed using the \verb+get_arrow+ function (defined in
+\verb+utils.c+). This function returns NULL if the arrow variable does
+not exist. For example:
+\begin{verbatim}
+   probdata = SCIPgetProbData(scip);
+   var = get_arrow(probdata->psd, i, j);
+   if( var != NULL )
+     printf("%s exists for $d <- $d\n",SCIPvarGetName(var), i, j);
+\end{verbatim}
+
+\section{Edge variables}
+\label{sec:edgevariables}
+
+An edge variable $I(i-j)$ ($i\neq j$) is a binary variable indicating
+there is an edge from BN node $i$ to BN node $j$ in the undirected
+skeleton (i.e.\ there is either an arrow from $i$ to $j$ or from $j$
+to $i$). These variables have objective coefficient
+\verb+-edge_penalty+. By default \verb+-edge_penalty+ is 0.  These
+variables are always created.
+
+\subsection{Implementation details}
+\label{sec:edgevariabledetails}
+
+Edge variables are implemented similarly to arrow variables, except
+that they are retrieved using a function called \verb+get_edge+.
+
+\chapter{Constraints (Development Manual)}
+\label{chap:constraints}
+
+In this (UNFINISHED!) chapter we list the constraints that are used by
+\gobnilp. Some of these constraints are implemented via specialised
+\scip \emph{constraint handlers}, others are simple linear or
+integrality constraints. Some constraints are always added, some added
+by default and some only added when the user chooses a non-default way
+of running \gobnilp.
+
+\section{Integrality}
+\label{sec:consintegrality}
+
+All family (\ref{sec:familyvariables}), arrow
+(\ref{sec:arrowvariables}) and edge (\ref{sec:edgevariables})
+variables must be integer valued for a solution to be feasible. These
+integrality constraints are always added.
+
+\subsection{Implementation details}
+\label{sec:consintdetails}
+
+This constraint is checked by \scip using its integrality constraint
+handler (see \scip source file \verb+cons_integral+). Declaring
+variables to be integer (in fact binary) is enough to ensure that all
+necessary integrality constraints are included in the problem
+instance.
+
+\section{Convexity}
+\label{sec:consconvexity}
+
+For each BN node, the constraint that it has exactly one parent set is
+a `set partitioning' constraint which is special sort of linear
+constraint. For example the constraint for BN node $i$ is:
+\[
+  \sum_{J} \fv{J}{i} = 1
+\]
+These constraints are always added.
+
+\subsection{Implementation details}
+\label{sec:consconvexdetails}
+
+These constraints are added by the \verb+addOneParentSetConstraints+
+function in \verb+probdata_bn.c+.
+
+\section{Arrow linking}
+\label{sec:consarrowlinking}
+
+For each arrow variable, $I(i\leftarrow j)$ ($i\neq j$) there is
+the following constraint linking it to family variables:
+\[
+  I(i\leftarrow j)  = \sum_{J:j \in J} \fv{J}{i}
+\]
+
+\subsection{Implementation details}
+\label{sec:consarrowlinkingdetails}
+These linear constraints in the function \verb+addArrowVariables+ in
+\verb+probdata_bn.c+.
+
+
+\section{Edge linking}
+\label{sec:consedgelinking}
+
+For each edge variable, $I(i-j)$ ($i\neq j$) there is
+the following constraint linking it to arrow variables:
+\[
+  I(i-j)  = I(i\leftarrow j) + I(j\leftarrow i)
+\]
+
+\subsection{Implementation details}
+\label{sec:consarrowlinkingdetails}
+These linear constraints in the function \verb+addArrowVariables+ in
+\verb+probdata_bn.c+.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Debugging}
+\label{sec:debugging}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Compiling in debug mode}
+\label{sec:dbg}
+
+To create a  \gobnilp{} executable that runs in debug mode, just
+`make' \scip{} and then \gobnilp{} with \texttt{OPT=dbg}:
+\begin{verbatim}
+make LPS=cpx OPT=dbg
+\end{verbatim}
+or (if without CPLEX)
+\begin{verbatim}
+make OPT=dbg
+\end{verbatim}
+After making \gobnilp{} in this way there will be a symbolic link from
+an executable whose name contains ``.dbg.'' to \texttt{gobnilp}. Just
+run this \gobnilp{} as normal. Execution will terminate with a
+suitable error message if an assert error is generated.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Using gdb}
+\label{sec:gdb}
+
+You can use \gdb{} to track down bugs. To do this you need to compile
+with the \verb+-g+ flag set. The simple way to do this is just to edit
+the Makefile. Replacing this:
+\begin{verbatim}
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+      @echo "-> compiling $@"
+      $(CC) $(FLAGS) $(OFLAGS) $(BINOFLAGS) $(CFLAGS) -c  $< $(CC_o)$@
+\end{verbatim}
+with this
+\begin{verbatim}
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+      @echo "-> compiling $@"
+      $(CC) $(FLAGS) $(OFLAGS) $(BINOFLAGS) $(CFLAGS) -c -g $< $(CC_o)$@
+\end{verbatim}
+Here is an abbreviated session using \gdb{} to track down a bug. Text
+after \texttt{(gdb)} is user input. Some newlines have been added for
+readability.
+\begin{small}
+\begin{verbatim}
+pc435h ~/research/gobnilp gdb
+GNU gdb (GDB) 7.2
+...
+(gdb) file bin/gobnilp
+Reading symbols from /n/staff/jc/research/gobnilp/bin/gobnilp...done.
+(gdb) run data/asia_100_pascores_3._filtered.pck.mon
+Starting program:
+/n/staff/jc/research/gobnilp/bin/gobnilp data/asia_100_pascores_3._filtered.pck.mon
+[Thread debugging using libthread_db enabled]
+Solving the BN structure learning problem using SCIP.
+....
+SCIP Status        : problem is solved [optimal solution found]
+Solving Time (sec) : 1.43
+Solving Nodes      : 1
+Primal Bound       : -2.45644265388390e+02 (7 solutions)
+Dual Bound         : -2.45644265388390e+02
+Gap                : 0.00 %
+0<-5,6, -21.675646
+1<- -71.525263
+2<-0,5, -2.247729
+3<-2, -16.935375
+4<- -12.354096
+5<-4, -2.737050
+6<-1, -65.918644
+7<-1, -52.250461
+BN score is -245.644265
+gobnilp: src/scip/primal.c:143:
+ SCIPprimalFree: Assertion `(*primal)->nexistingsols == 0' failed.
+
+Program received signal SIGABRT, Aborted.
+0x00007ffff679c035 in raise () from /lib64/libc.so.6
+(gdb) backtrace
+#0  0x00007ffff679c035 in raise () from /lib64/libc.so.6
+#1  0x00007ffff679d9e6 in abort () from /lib64/libc.so.6
+#2  0x00007ffff67948e5 in __assert_fail () from /lib64/libc.so.6
+#3  0x000000000059dc81 in SCIPprimalFree (primal=0x140d080, blkmem=0x140f1b0) at src/scip/primal.c:143
+#4  0x00000000005c43cf in freeTransform (scip=0x140d010) at src/scip/scip.c:7302
+#5  0x00000000005c5ce7 in SCIPfreeTransform (scip=0x140d010) at src/scip/scip.c:7764
+#6  0x0000000000407303 in main (argc=2, argv=0x7fffffffde98) at src/gobnilp.c:279
+(gdb) q
+\end{verbatim}
+\end{small}
+Note that the \gobnilp{} executable here must have been compiled using
+\texttt{OPT=dbg} since an assert error has been raised. \gdb{} can be
+used with any sort of \gobnilp{} executable.
+
+% \section{Input format}
+% \label{sec:input}
+
+% \gobnilp\ operates on local scores stating the likelihoods of a
+% variable having a particular set of parents in the BN.  There are
+% multiple ways that these may be computed from observations and
+% \gobnilp\ accepts scores computed by any of these methods as input.
+% In addition, \gobnilp\ can take the observations directly as input and
+% use them to compute BDeu scores, which are then used to find an
+% optimal BN.  \gobnilp\ also accepts input in \scip 's CIP format.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{\gobnilp{} parameter listing}
+\label{chap:gobnilpparams}
+
+In this chapter all current \gobnilp{} parameters are listed. Quite a
+few of these are not described in the main text of this
+manual. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Parameters only available if BLAS installed}
+\label{sec:blasparams}
+
+\begin{verbatim}
+# whether the data is continuous
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/scoring/continuous = FALSE
+
+# Added to the number of variables to get the degrees of freedom (alpha_omega) for Wishart prior for BGe scoring
+# [type: int, range: [2,2147483647], default: 2]
+gobnilp/scoring/alpha_omega_minus_nvars = 2
+
+# alpha_mu scaling parameter in normal-Wishart prior distribution for BGe scoring
+# [type: real, range: [0.000001,1e+20], default: 1.0]
+gobnilp/scoring/alpha_mu = 1.0
+
+\end{verbatim}
+
+
+\section{Dagcluster constraint parameters}
+\label{sec:dagclusterconstraintparams}
+
+\begin{verbatim}
+# frequency for separating cuts (-1: never, 0: only in root node)
+# [type: int, range: [-1,2147483647], default: 10]
+constraints/dagcluster/sepafreq = 10
+
+# frequency for propagating domains (-1: never, 0: only in root node)
+# [type: int, range: [-1,2147483647], default: 1]
+constraints/dagcluster/propfreq = 1
+
+# timing when constraint propagation should be called (1:BEFORELP, 2:DURINGLPLOOP, 4:AFTERLPLOOP, 15:ALWAYS)
+# [type: int, range: [1,15], default: 1]
+constraints/dagcluster/timingmask = 1
+
+# frequency for using all instead of only the useful constraints in separation, propagation and enforcement (-1: never, 0: only in first evaluation)
+# [type: int, range: [-1,2147483647], default: 100]
+constraints/dagcluster/eagerfreq = 100
+
+# maximal number of presolving rounds the constraint handler participates in (-1: no limit)
+# [type: int, range: [-1,2147483647], default: -1]
+constraints/dagcluster/maxprerounds = -1
+
+# should separation method be delayed, if other separators found cuts?
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/delaysepa = FALSE
+
+# should propagation method be delayed, if other propagators found reductions?
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/delayprop = FALSE
+
+# should presolving method be delayed, if other presolvers found reductions?
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/delaypresol = FALSE
+
+# maximum k to try for k-cluster cutting planes
+# [type: int, range: [1,2147483647], default: 1]
+constraints/dagcluster/kmax = 1
+
+# maximum k to try for k-cluster cutting planes in the root
+# [type: int, range: [1,2147483647], default: 1]
+constraints/dagcluster/kmaxroot = 1
+
+# whether to add cluster cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/dagcluster/clustercuts_addtopool = TRUE
+
+# whether to propagate added set packing constraints
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/dagcluster/propagatespc = TRUE
+
+# only write out pre-separation MIP relaxation after reaching this number of calls to separator
+# [type: int, range: [1,2147483647], default: 1]
+constraints/dagcluster/writemip_minsepalp_calls = 1
+
+# only write out pre-separation MIP relaxation if not beyond this number of calls to separator
+# [type: int, range: [0,2147483647], default: 0]
+constraints/dagcluster/writemip_maxsepalp_calls = 0
+
+# do not use the subIP to search for cluster cuts if deeper than this (-1 for no limit)
+# [type: int, range: [-1,2147483647], default: -1]
+constraints/dagcluster/subipdepthlimit = -1
+
+# whether to look for cluster cuts which are tight for the current incumbent
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/useincumbentcons = FALSE
+
+# whether to always use the subIP to look for cluster cuts
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/dagcluster/subipalways = TRUE
+
+# whether to ever use the subIP to look for cluster cuts
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/dagcluster/subipever = TRUE
+
+# whether to always use fractional cycles to look for cluster cuts
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/fractionalalways = FALSE
+
+# whether to ever use fractional cycles to look for cluster cuts
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/fractionalever = FALSE
+
+# whether to search for convex4 cuts when separating an arbitrary primal solution
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/sepasol_useconvex4 = FALSE
+
+# time limit on sub IP for finding cluster cuts in LP separation
+# [type: real, range: [0,1e+20], default: 10]
+constraints/dagcluster/conssepalpsubiptimelimit = 10
+
+# time limit on sub IP for finding cluster cuts in arbitrary primal solution separation
+# [type: real, range: [0,1e+20], default: 10]
+constraints/dagcluster/conssepasolsubiptimelimit = 10
+
+# time limit on sub IP for finding cluster cuts in LP enforcement
+# [type: real, range: [0,1e+20], default: 20]
+constraints/dagcluster/consenfolpsubiptimelimit = 20
+
+# gap limit on sub IP for finding cluster cuts in LP separation
+# [type: real, range: [0,1.7e+308], default: 0]
+constraints/dagcluster/conssepalpsubipgaplimit = 0
+
+# gap limit on sub IP for finding cluster cuts in arbitrary primal solution separation
+# [type: real, range: [0,1.7e+308], default: 0]
+constraints/dagcluster/conssepasolsubipgaplimit = 0
+
+# gap limit on sub IP for finding cluster cuts in LP enforcement
+# [type: real, range: [0,1.7e+308], default: 0]
+constraints/dagcluster/consenfolpsubipgaplimit = 0
+
+# absgap limit on sub IP for finding cluster cuts in LP separation
+# [type: real, range: [0,1.7e+308], default: 0]
+constraints/dagcluster/conssepalpsubipabsgaplimit = 0
+
+# absgap limit on sub IP for finding cluster cuts in arbitrary primal solution separation
+# [type: real, range: [0,1.7e+308], default: 0]
+constraints/dagcluster/conssepasolsubipabsgaplimit = 0
+
+# absgap limit on sub IP for finding cluster cuts in LP enforcement
+# [type: real, range: [0,1.7e+308], default: 0]
+constraints/dagcluster/consenfolpsubipabsgaplimit = 0
+
+# whether to force all cuts to be added
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/dagcluster/forcecuts = TRUE
+
+# whether to do extra (slow) propagations
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/dagcluster/extraprops = FALSE
+
+# no cuts generated in root if gap is below this value
+# [type: real, range: [0,1e+20], default: 0.001]
+constraints/dagcluster/rootgapsepalimit = 0.001
+
+# whether cluster cuts should be added based on cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/circuit_cuts/add_cluster_cuts = TRUE
+
+# whether cluster cuts should be added to the pool based on cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/circuit_cuts/add_cluster_cuts_to_pool = FALSE
+
+# whether cycle cuts should be added based on cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/circuit_cuts/add_cycle_cuts = FALSE
+
+# whether cycle cuts should be added to the pool based on cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/circuit_cuts/add_cycle_cuts_to_pool = FALSE
+
+# whether cuts should be added based on fractional cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/circuit_cuts/use_fractional = TRUE
+
+# the maximum length of cycle to search for
+# [type: int, range: [0,2147483647], default: 6]
+gobnilp/circuit_cuts/max_length = 6
+
+# whether cluster cuts should be added based on fractional cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/fractional_circuit_cuts/add_cluster_cuts = TRUE
+
+# whether cluster cuts should be added to the pool based on fractional cycles in the current solution
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/fractional_circuit_cuts/add_cluster_cuts_to_pool = FALSE
+
+\end{verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section{Convex4 cuts}
+\label{sec:convext4params}
+
+\begin{verbatim}
+# maximum number of 'convexhull4b' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/b_init_limit = 0
+
+# maximum number of 'convexhull4c' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/c_init_limit = 0
+
+# maximum number of 'convexhull4d' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/d_init_limit = 0
+
+# maximum number of 'convexhull4e' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/e_init_limit = 0
+
+# maximum number of 'convexhull4g' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/g_init_limit = 0
+
+# maximum number of 'convexhull4h' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/h_init_limit = 0
+
+# maximum number of 'convexhull4i' cuts to add initially (-1 for no upper bound)
+# [type: int, range: [-1,2147483647], default: 0]
+constraints/convex4_cuts/i_init_limit = 0
+
+# whether to add initial 'convexhull4b' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/b_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4c' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/c_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4d' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/d_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4e' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/e_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4g' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/g_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4h' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/h_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4i' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/i_init_addtopool = FALSE
+
+# whether to add initial 'convexhull4b' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/b_init_addcut = TRUE
+
+# whether to add initial 'convexhull4c' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/c_init_addcut = TRUE
+
+# whether to add initial 'convexhull4d' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/d_init_addcut = TRUE
+
+# whether to add initial 'convexhull4e' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/e_init_addcut = TRUE
+
+# whether to add initial 'convexhull4g' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/g_init_addcut = TRUE
+
+# whether to add initial 'convexhull4h' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/h_init_addcut = TRUE
+
+# whether to add initial 'convexhull4i' cuts to the initial LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/i_init_addcut = TRUE
+
+# whether to use 'convexhull4b' cuts
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/b_enable = TRUE
+
+# whether to use 'convexhull4c' cuts
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/c_enable = FALSE
+
+# whether to use 'convexhull4d' cuts
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/d_enable = FALSE
+
+# whether to use 'convexhull4e' cuts 
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/e_enable = FALSE
+
+# whether to use 'convexhull4g' cuts
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/g_enable = FALSE
+
+# whether to use 'convexhull4h' cuts 
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/h_enable = FALSE
+
+# whether to use 'convexhull4i' cuts 
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/i_enable = FALSE
+
+# whether to add separating 'convexhull4b' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/b_addtopool = TRUE
+
+# whether to add separating 'convexhull4c' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/c_addtopool = TRUE
+
+# whether to add separating 'convexhull4d' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/d_addtopool = TRUE
+
+# whether to add separating 'convexhull4e' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/e_addtopool = TRUE
+
+# whether to add separating 'convexhull4g' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/g_addtopool = TRUE
+
+# whether to add separating 'convexhull4h' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/h_addtopool = TRUE
+
+# whether to add separating 'convexhull4i' cuts to the global cut pool
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/i_addtopool = TRUE
+
+# whether to add separating 'convexhull4b' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/b_addcut = TRUE
+
+# whether to add separating 'convexhull4c' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/c_addcut = TRUE
+
+# whether to add separating 'convexhull4d' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/d_addcut = TRUE
+
+# whether to add separating 'convexhull4e' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/e_addcut = TRUE
+
+# whether to add separating 'convexhull4g' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/g_addcut = TRUE
+
+# whether to add separating 'convexhull4h' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/h_addcut = TRUE
+
+# whether to add separating 'convexhull4i' cuts to the LP
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/i_addcut = TRUE
+
+# whether to only add 'convexhull4b' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/convex4_cuts/b_delay = FALSE
+
+# whether to only add 'convexhull4b' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/c_delay = TRUE
+
+# whether to only add 'convexhull4d' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/d_delay = TRUE
+
+# whether to only add 'convexhull4e' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/e_delay = TRUE
+
+# whether to only add 'convexhull4g' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/g_delay = TRUE
+
+# whether to only add 'convexhull4h' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/h_delay = TRUE
+
+# whether to only add 'convexhull4i' when no cluster cuts can be found
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/convex4_cuts/i_delay = TRUE
+\end{verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\section{Conditional independence constraint parameters}
+\label{sec:ciconstraintparams}
+
+\begin{verbatim}
+
+# frequency for separating cuts (-1: never, 0: only in root node)
+# [type: int, range: [-1,2147483647], default: 1]
+constraints/ci/sepafreq = 1
+
+# frequency for propagating domains (-1: never, 0: only in root node)
+# [type: int, range: [-1,2147483647], default: -1]
+constraints/ci/propfreq = -1
+
+# timing when constraint propagation should be called (1:BEFORELP, 2:DURINGLPLOOP, 4:AFTERLPLOOP, 15:ALWAYS)
+# [type: int, range: [1,15], default: 1]
+constraints/ci/timingmask = 1
+
+# frequency for using all instead of only the useful constraints in separation, propagation and enforcement (-1: never, 0: only in first evaluation)
+# [type: int, range: [-1,2147483647], default: 100]
+constraints/ci/eagerfreq = 100
+
+# maximal number of presolving rounds the constraint handler participates in (-1: no limit)
+# [type: int, range: [-1,2147483647], default: -1]
+constraints/ci/maxprerounds = -1
+
+# should separation method be delayed, if other separators found cuts?
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/ci/delaysepa = FALSE
+
+# should propagation method be delayed, if other propagators found reductions?
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/ci/delayprop = FALSE
+
+# should presolving method be delayed, if other presolvers found reductions?
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+constraints/ci/delaypresol = FALSE
+
+# whether to force all cuts to be added
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+constraints/ci/forcecuts = TRUE
+
+\end{verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Sink heuristic parameters}
+\label{sec:sinkparams}
+
+\begin{verbatim}
+
+# priority of heuristic <sinks>
+# [type: int, range: [-536870912,536870911], default: 10]
+heuristics/sinks/priority = 10
+
+# frequency for calling primal heuristic <sinks> (-1: never, 0: only at depth freqofs)
+# [type: int, range: [-1,2147483647], default: 0]
+heuristics/sinks/freq = 0
+
+# frequency offset for calling primal heuristic <sinks>
+# [type: int, range: [0,2147483647], default: 0]
+heuristics/sinks/freqofs = 0
+
+# maximal depth level to call primal heuristic <sinks> (-1: no limit)
+# [type: int, range: [-1,2147483647], default: -1]
+heuristics/sinks/maxdepth = -1
+
+# whether to print *every* BN found by sink heuristic (in SCIP solution format)
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+heuristics/sinks/printsols = FALSE
+
+# whether to use probing
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+heuristics/sinks/probing = FALSE
+
+# maximum dive depth when using probing
+# [type: int, range: [0,2147483647], default: 100]
+heuristics/sinks/maxdivedepth = 100
+
+# initial value for random seed
+# [type: int, range: [0,2147483647], default: 0]
+heuristics/sinks/seed = 0
+
+# how many times to run the heuristic on each LP solution
+# [type: int, range: [0,2147483647], default: 1]
+heuristics/sinks/nruns = 1
+
+# whether to assume that no problem variable has a positive objective coefficient
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+heuristics/sinks/assumenoposobj = TRUE
+
+# where to print solutions found by sink heuristic
+# [type: string, default: ""]
+heuristics/sinks/filesols = ""
+\end{verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Scoring parameters}
+\label{sec:scoringparams}
+
+\begin{verbatim}
+# whether to prune during scoring
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/prune = TRUE
+
+# minimum number of datapoints to create a branch in the AD tree
+# [type: int, range: [0,2147483647], default: 1000]
+gobnilp/scoring/rmin = 1000
+
+# limit on the depth of the AD tree
+# [type: int, range: [0,2147483647], default: 1000]
+gobnilp/scoring/adtreedepthlim = 1000
+
+# limit on the number of nodes in  the AD tree
+# [type: int, range: [0,2147483647], default: 10000]
+gobnilp/scoring/adtreenodeslim = 10000
+
+# limit on number of scores that are cached
+# [type: int, range: [0,2147483647], default: 10000000]
+gobnilp/scoring/cachesizelimit = 10000000
+
+# how much to increase the cache when needed and allowed
+# [type: int, range: [0,2147483647], default: 10000]
+gobnilp/scoring/cacheblocksize = 10000
+
+# subsets must have size below this to be cached
+# [type: int, range: [0,2147483647], default: 4]
+gobnilp/scoring/nvarscachelimit = 4
+
+# maximum number of parents for each node (-1 for no limit)
+# [type: int, range: [-1,2147483647], default: 3]
+gobnilp/scoring/palim = 3
+
+# alpha value for use in BDeu scoring
+# [type: real, range: [0,1e+20], default: 1]
+gobnilp/scoring/alpha = 1
+
+# whether variable names are given in the data file
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/names = TRUE
+
+# whether variable arities are given in the data file
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/arities = TRUE
+
+# If Pa1 and Pa2 are parent sets for some variable, Pa1 is a subset of Pa2 and local_score(Pa1) >= local_score(Pa2) - prunegap then Pa2 will be pruned
+# [type: real, range: [0,1e+20], default: 0]
+gobnilp/scoring/prunegap = 0
+
+# whether to fast scoring (which is inaccurate for high values of ESS)
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/scoring/fast = TRUE
+
+\end{verbatim}
+
+
+\section{Other \gobnilp{} parameters}
+\label{sec:gobnilpparams}
+
+\begin{verbatim}
+# whether model averaging should assume logarithmic objective function
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/logaverage = TRUE
+
+# whether a verbosity level of at most 3 suppresses columns in the display
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/verblevelsetscols = TRUE
+
+# whether the problem is 'vanilla' BN learning
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/vanilla = FALSE
+
+# whether to disallow immoralities
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/noimmoralities = FALSE
+
+# whether to assume a decomposable model is being learned with a 
+# likelihood-equivalent score
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/decomposable = FALSE
+
+# whether to only allow a covered arc i<-j if i<j
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/orderedcoveredarcs = FALSE
+
+# whether to (additionally) print BNs in SCIP solution format
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/printscipsol = FALSE
+
+# whether to presolve the problem before printing out CIP version
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/presolvecip = FALSE
+
+# the maximum number of children a node can have (-1 for no limit)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxnchildren = -1
+
+# gobnilp to find the 'nbns' best BNs (in decreasing order of score )
+# [type: int, range: [1,2147483647], default: 1]
+gobnilp/nbns = 1
+
+# minimum number of founders
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/minfounders = 0
+
+# maximum number of founders (-1 for no upper bound )
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxfounders = -1
+
+# minimum number of parents
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/minparents = 0
+
+# maximum number of parents (-1 for no upper bound )
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxparents = -1
+
+# minimum number of edges
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/minedges = 0
+
+# maximum number of edges (-1 for no upper bound )
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxedges = -1
+
+# file containing constraints on dag structure
+# [type: string, default: ""]
+gobnilp/dagconstraintsfile = ""
+
+# whether to treat consecutive delimitors in the input file as one
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/mergedelimiters = TRUE
+
+# the delimiter for fields in the input file (special values - whitespace, tab)
+# [type: string, default: "whitespace"]
+gobnilp/delimiter = "whitespace"
+
+# whether to create totalorder variables
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/totalordervars = FALSE
+
+# whether to create variables counting the number of children a node has
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/nchildrenvars = FALSE
+
+# whether to only allow best scoring parents for a given total order
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/bestparentsfororder = TRUE
+
+# whether to use SCIP's linear ordering constraint
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/useconslinearordering = TRUE
+
+# whether to use the dagcluster acyclicity constraint
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/useconsdagcluster = TRUE
+
+# whether to add transitivity constraints on totalorder variables initially (rather than later as cutting planes)
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/inittransitivity = FALSE
+
+# whether to create imset variables
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/imsetvars = FALSE
+
+# whether to create position indicator variables
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/posindvars = FALSE
+
+# whether to create position variables
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/posvars = FALSE
+
+# maximum value of a position variable (-1 for no restriction)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxpos = -1
+
+# whether to create position variables indicate position in a total order of BN variables
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/postotal = FALSE
+
+# whether to create parent set size variables
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/pasizevars = FALSE
+
+# branching priority of parent set size variables
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/pasizepriority = 0
+
+# branching priority of family variables
+# [type: int, range: [-2147483647,2147483647], default: 0]
+gobnilp/pavarspriority = 0
+
+# branching priority of edge variables
+# [type: int, range: [-2147483647,2147483647], default: 10]
+gobnilp/edgevarpriority = 10
+
+# branching priority of nchildrenvar variables
+# [type: int, range: [-2147483647,2147483647], default: 0]
+gobnilp/nchildrenvarpriority = 0
+
+# branching priority of arrow variables
+# [type: int, range: [-2147483647,2147483647], default: 10]
+gobnilp/arrowvarpriority = 10
+
+# branching priority of imset variables
+# [type: int, range: [-2147483647,2147483647], default: 0]
+gobnilp/imsetvarpriority = 0
+
+# branching priority of imset variables
+# [type: int, range: [-2147483647,2147483647], default: 0]
+gobnilp/totalordervarpriority = 0
+
+# branching priority of posind variables
+# [type: int, range: [-2147483647,2147483647], default: 0]
+gobnilp/posindvarpriority = 0
+
+# whether to split dagcluster constraints into strongly connected components
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/splitdags = TRUE
+
+# edge_penalty*|edges| is subtracted from objective
+# [type: real, range: [-1e+20,1e+20], default: 0]
+gobnilp/edge_penalty = 0
+
+# whether GOBNILP should return exemplars of the k best MECs instead of the k best BNs
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/kbestMEC = FALSE
+
+# file which solution should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: "stdout"]
+gobnilp/outputfile/solution = "stdout"
+
+# file which dot output should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/dot = ""
+
+# file which pedigree output should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/pedigree = ""
+
+# file which additional score and time data should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/scoreandtime = ""
+
+# file which adjacency matrix output should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/adjacencymatrix = ""
+
+# file which cip problem representation should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/cip = ""
+
+# how many iterations to skip before first model averaging output (-1 to suppress always)
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/avgoutputoffset = -1
+
+# how many iterations between outputting model averaging information
+# [type: int, range: [1,2147483647], default: 1]
+gobnilp/avgoutputstep = 1
+
+# file which model averging solution should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: "stdout"]
+gobnilp/outputfile/solutionavg = "stdout"
+
+# file which model averging dot output should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/dotavg = ""
+
+# file which model averging pedigree output should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/pedigreeavg = ""
+
+# file which model averging additional score and time data should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/scoreandtimeavg = ""
+
+# file which model averging adjacency matrix output should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/adjacencymatrixavg = ""
+
+# file which parent set scores should be output (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/scores = ""
+
+# file which Markov equivalence class should be output (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/mec = ""
+
+# file to which parent set scores should be output (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/pss = ""
+\end{verbatim}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Citing \gobnilp}
+
+When citing \gobnilp{} please use
+\cite{cussens11:_bayes_networ_learn_cuttin_planes} and/or
+\cite{bartlett13:_advan_bayes_networ_learn_integ_progr}.
+(\gobnilp{} is an
+improved version of the software used to create the results in the
+first of these
+papers.)  You should also cite \scip. See \url{http://scip.zib.de/licence.shtml}
+for how to do this. It would also be odd not to cite \cite{jaakkola10:_learn_bayes_networ_struc_lp_relax}.
+The use of ILP for pedigree learning is introduced in \cite{genepi},
+which should also be cited if you use \gobnilp\ for this purpose.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Acknowledgements}
+
+\begin{itemize}
+
+\item GOBNILP version 1.2-1.6
+    and higher was supported by MRC Project Grant G1002312.
+\item
+Many thanks are due to the \scip{} developers for writing and
+  distributing SCIP and also helping with queries. Particular thanks
+  are due to: Tobias Achterberg, Timo Berthold, Ambros Gleixner,
+  Gerald Gamrath, Stefan Heinz, Michael Winkler and Kati Wolter.
+
+\item  Marc Pfetsch wrote the \verb+cons_linearordering.c+ constraint handler
+   which provided a
+   useful 'template' which helped JC write \verb+cons_dagcluster.c+.
+
+ \item The most important part of the separation routine in
+   \verb+cons_dagcluster.c+ uses the `cluster constraint' introduced in
+   \cite{jaakkola10:_learn_bayes_networ_struc_lp_relax}.
+   Additional thanks to Tommi Jaakkola and David Sontag for providing
+   data and encouragement-to-distribute, respectively.
+
+ \item Sam Vozza wrote the code for BGe scoring.
+
+ \end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Correctness of pruning}
+\label{sec:pruning}
+
+The \gobnilp{} BDeu scoring code uses a slightly
+modified version of the pruning approach devised by de
+Campos and Ji \cite{campos10:_proper_bayes_diric_scores_learn}. Search
+for ``de Campos and Ji'' in the source. The slight modification is
+that there is no check on the value of the \emph{effective sample
+  size}. This section provides a justification for this modification
+(and an alternative BDeu-specific proof that the de Campos and Ji
+pruning is valid).
+
+
+\begin{lemma}
+  Let $n_{ij}$ be a positive integer and $\alpha'$ be a positive
+  real. Then
+  \begin{equation}
+    \label{eq:repeated}
+  \log \frac{\Gamma(n_{ij}+\alpha')}{\Gamma(\alpha')}
+  =
+  \sum_{i=0}^{n_{ij}-1} \log(i + \alpha')
+  \end{equation}
+\end{lemma}
+\begin{proof}
+  Consider the identity $\Gamma(x+1) \equiv x\Gamma(x)$.
+  From this identity it follows that $\Gamma(n_{ij}+\alpha') =
+  (n_{ij}+\alpha'-1)\Gamma(n_{ij}+\alpha'-1)$.
+  The result follows by repeated application of this identity.
+\end{proof}
+
+
+\begin{lemma}
+  Let $\{n_{ijk}\}_{k=1, \dots r_{i}}$  be non-negative integers with a
+  positive sum $n_{ij} = \sum_{k=1}^{r_{i}}n_{ijk}$.   Let
+  $\alpha''$  be a positive real. Then
+  \begin{equation}
+    \label{eq:ub}
+    \sum_{k=1}^{r_{i}}
+    \log \frac{\Gamma(n_{ijk}+\alpha'')}{\Gamma(\alpha'')}
+    \leq
+    \log \frac{\Gamma(n_{ij}+\alpha'')}{\Gamma(\alpha'')}
+  \end{equation}
+\end{lemma}
+\begin{proof}
+  With the
+  sum $n_{ij} = \sum_{k=1}^{r_{i}}n_{ijk}$ fixed consider
+  distributions of counts  $\{n_{ijk}\}_{k=1, \dots r_{i}}$ over the
+  $r_i$ `cells'.
+  If $n_{ijk^{*}} = n_{ij}$ for some $k^*$ then $n_{ijk} = 0 $ for all
+  other values of $k$ and it is clear that $ \sum_{k=1}^{r_{i}} \log
+  \frac{\Gamma(n_{ijk}+\alpha'')}{\Gamma(\alpha'')} = \log
+  \frac{\Gamma(n_{ij}+\alpha'')}{\Gamma(\alpha'')}$.   Suppose now that
+  there are two indices $k_1$ and $k_2$ such that $n_{ijk_{1}}>0$ and
+  $n_{ijk_{2}} > 0$, and suppose, wlog, that $n_{ijk_{1}} \geq
+  n_{ijk_{2}}$. Consider moving one count from cell $k_1$ to cell
+  $k_2$, that is: increasing $n_{ijk_{1}}$ by one and
+  decreasing $n_{ijk_{2}}$ by one (so that $n_{ij}$ remains constant).
+  By (\ref{eq:repeated}) the increase in the LHS of (\ref{eq:ub}) is
+  $\log(n_{ijk_{1}}+\alpha'') - \log(n_{ijk_{2}}-1+\alpha'')$. Since
+  $n_{ijk_{1}} \geq n_{ijk_{2}}$ this is a positive increase. By
+  increasing big counts at the expense of small counts in this way a
+  sequence of distributions of the fixed sum $n_{ij}$ over the $r_i$
+  cells can be constructed for which the LHS of  (\ref{eq:ub}) is
+  increasing. The sequence terminates when $n_{ijk^{*}} = n_{ij}$ for
+  some $k^*$. The result follows.
+\end{proof}
+\begin{theorem}
+  \label{thm:main}
+  \begin{equation}
+    \label{eq:main_ineq}
+    \sum_{j=1}^{q_{i}} \log
+    \frac{\Gamma(\alpha')}{\Gamma(n_{ij}+\alpha')}
+    +     \sum_{k=1}^{r_{i}} \log
+    \frac{\Gamma(n_{ijk}+\frac{\alpha'}{r_{i}})}{\Gamma(\frac{\alpha'}{r_{i}})}
+\leq \sum_{j:n_{ij}>0} \sum_{i=0}^{n_{ij}-1} \log \left( \frac{i +
+    \alpha' / r_{i}}{i + \alpha'}\right)
+  \end{equation}
+\end{theorem}
+\begin{proof}
+  \begin{eqnarray}
+    \label{eq:proof1}
+    \lefteqn{\sum_{j=1}^{q_{i}} \log
+    \frac{\Gamma(\alpha')}{\Gamma(n_{ij}+\alpha')}
+    +     \sum_{k=1}^{r_{i}} \log
+    \frac{\Gamma(n_{ijk}+\frac{\alpha'}{r_{i}})}{\Gamma(\frac{\alpha'}{r_{i}})}} &&
+   \nonumber \\
+    & \leq &  \sum_{j=1}^{q_{i}} \log \left(
+        \frac{\Gamma(\alpha')}{\Gamma(n_{ij}+\alpha')}
+        \frac{\Gamma(n_{ij}+\alpha'/r_{i})}{\Gamma(\alpha'/r_{i})}\right)
+      \qquad \mbox{ by (\ref{eq:ub})} \nonumber \\
+      & = & \sum_{j=1}^{q_{i}} \sum_{i=0}^{n_{ij}-1} \log \left(
+        \frac{i + \alpha'/r_{i}}{i + \alpha'}\right)       \qquad \mbox{
+        by (\ref{eq:repeated})} \nonumber \\
+& = & \sum_{j:n_{ij}>0} \sum_{i=0}^{n_{ij}-1} \log \left( \frac{i +
+    \alpha' / r_{i}}{i + \alpha'}\right) \nonumber
+  \end{eqnarray}
+\end{proof}
+\begin{corollary}
+  Let $r_{i}>1$ and define $q^{(+)} \equiv |\{j:n_{ij}>0\}|$ then
+ \begin{equation}
+    \label{eq:corr_ineq}
+  \sum_{j=1}^{q_{i}} \log
+    \frac{\Gamma(\alpha')}{\Gamma(n_{ij}+\alpha')}
+    +     \sum_{k=1}^{r_{i}} \log
+    \frac{\Gamma(n_{ijk}+\frac{\alpha'}{r_{i}})}{\Gamma(\frac{\alpha'}{r_{i}})}
+    \leq
+    -q^{(+)} \log r_{i}
+  \end{equation}
+\end{corollary}
+\begin{proof}
+  If $n_{ij}>0$ then
+  \begin{eqnarray}
+    \label{eq:foo}
+\sum_{i=0}^{n_{ij}-1} \log \left(
+  \frac{i + \alpha'/r_{i}}{i + \alpha'}\right)
+& = & -\log r_{i} + \sum_{i=1}^{n_{ij}-1}  \log \left(
+  \frac{i + \alpha'/r_{i}}{i + \alpha'}\right) \nonumber \\
+& \leq &  -\log r_{i} \nonumber
+\end{eqnarray}
+The inequality holds because each term in the sum on the RHS is
+negative (since $r_{i}>1$). The result then follows from Theorem~\ref{thm:main}.
+\end{proof}
+\begin{corollary}
+  Consider a fixed child variable $i$ with $r_i$ values. Let $W$ and
+  $W'$ be distinct candidate parent sets for $i$ such that $W \subset
+  W'$. Let $c(i,W)$ the the BDeu local score for $W$ as the parent set
+  of $i$ (for some fixed ESS $\alpha$). Let $q^{(+)}(W')$ be the number
+  of positive counts in the contingency table for $W'$. If $c(i,W) >
+  -q^{(+)}(W') \log r_{i}$ then neither $W'$ nor any of the supersets
+  of $W'$ can be an optimal parent set for $i$.
+\end{corollary}
+\begin{proof}
+  The LHS of (\ref{eq:corr_ineq}) is the BDeu local score for a parent
+  set $W'$ which has $q_{i}$ counts $n_{ij}$ in its contingency table and
+  counts $n_{ijk}$ in the contingency table for $W' \cup \{i\}$ and
+  where $\alpha' = \alpha/q_{i}$. If
+  $-q^{(+)}(W') \log r_{i} < c(i,W)$ then $c(i,W)$ is certainly higher
+  than the local BDeu score for $W'$ due to (\ref{eq:corr_ineq}). If
+  $W' \subset W''$ then $q^{(+)}(W'') \geq q^{(+)}(W')$ and so
+  $-q^{(+)}(W'')\log r_{i} \leq -q^{(+)}(W') \log r_{i}$. From this it
+  follows that the local score for $W''$ must also be less than
+  $c(i,W)$. Consider a BN where $W'$ or one of its supersets is a
+  parent set for $i$. A BN with a higher score can be obtained by
+  replacing that parent set with $W$. The result follows.
+\end{proof}
+
+
+\bibliographystyle{plain}
+\bibliography{manual}
+
+\end{document}
+
+
+\gobnilp{} parameters come in four flavours: global parameters,
+those effecting `plugins' in \gobnilp , those used by the BDeu scorer
+and those specifically related to
+learning pedigrees. Global parameters are listed in
+this section. Each parameter has
+three lines (description, type and setting) in \texttt{gobnilp.set}
+which are shown here.  Apart from gobnilp/implicitfounders and
+gobnilp/nbns these parameters either affect what is output or allow
+the user to impose constraints on the structure of the BN DAG. For
+such parameters the following list just points you to a fuller
+explanation in either Section~\ref{sec:output} or \ref{sec:structure}.
+
+
+\begin{description}
+\item[gobnilp/dagconstraintsfile] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# file containing constraints on dag structure
+# [type: string, default: ""]
+gobnilp/dagconstraintsfile = ""
+\end{verbatim}
+\item[gobnilp/implicitfounders]
+  Let $\fv{W}{v}$ be the binary variable determining whether $W$ is
+  the parent set for $v$.
+  Normally \gobnilp{} uses
+  \emph{set partitioning} constraints $\forall v: \sum_{W}\fv{W}{v} = 1$, stating that
+  each variable has exactly one parent set. If
+  \texttt{gobnilp/implicitfounders} is \texttt{TRUE}, \gobnilp{}
+  (effectively) replaces each variable $\fv{\emptyset}{v}$ with the linear
+  expression $1 - \sum_{W:W\neq\emptyset}\fv{W}{v}$ and weakens the
+  set partitioning constraints to the \emph{set packing} constraints:
+  $\forall v:\sum_{W:W\neq\emptyset}\fv{W}{v} \leq 1$. An advantage of
+  using set packing constraints is that \scip{} knows that setting any
+  of the variables in such a constraint to zero will never break the
+  constraint. Note that if \texttt{gobnilp/implicitfounders} is
+  \texttt{TRUE} the objective coefficients for the remaining
+  $\fv{W}{v}$ become positive---each measuring how much better each
+  non-empty $W$ is than the empty set as a parent set for $v$.
+\begin{verbatim}
+# whether to represent empty parent sets implicitly
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/implicitfounders = FALSE
+\end{verbatim}
+
+\item[gobnilp/maxedges] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# maximum number of edges (-1 for no upper bound )
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxedges = -1
+\end{verbatim}
+
+\item[gobnilp/maxfounders] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# maximum number of founders (-1 for no upper bound )
+# [type: int, range: [-1,2147483647], default: -1]
+gobnilp/maxfounders = -1
+\end{verbatim}
+
+\item[gobnilp/minedges] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# minimum number of edges
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/minedges = 0
+\end{verbatim}
+
+
+\item[gobnilp/minfounders] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# minimum number of founders
+# [type: int, range: [0,2147483647], default: 0]
+gobnilp/minfounders = 0
+\end{verbatim}
+
+
+
+\item[gobnilp/nbns] If set to $k$ \gobnilp{} will find the $k$ highest
+  scoring BNs in descending order of score, breaking ties arbitrarily.
+\begin{verbatim}
+# gobnilp to find the 'nbns' best BNs ( in decreasing order of score )
+# [type: int, range: [1,2147483647], default: 1]
+gobnilp/nbns = 1
+\end{verbatim}
+\item[gobnilp/noimmoralities] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# whether to disallow immoralities
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/noimmoralities = FALSE
+\end{verbatim}
+\item[gobnilp/orderedcoveredarcs] See Section~\ref{sec:structure}.
+\begin{verbatim}
+# whether to only allow a covered arc i<-j if i<j
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/orderedcoveredarcs = FALSE
+\end{verbatim}
+\item[gobnilp/outputfile/adjacencymatrix] See Section~\ref{sec:output}.
+\begin{verbatim}
+# where the adjacency matrix representation of the BN should be output
+# [type: string, default: ""]
+gobnilp/outputfile/adjacencymatrix = ""
+\end{verbatim}
+\item[gobnilp/outputfile/cip] See Section~\ref{sec:output}.
+\begin{verbatim}
+# file which cip problem representation should be printed to (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/cip = ""
+\end{verbatim}
+\item[gobnilp/outputfile/dot] See Section~\ref{sec:output}.
+\begin{verbatim}
+# where the dot representation of the BN should be output
+# [type: string, default: ""]
+gobnilp/outputfile/dot = ""
+\end{verbatim}
+\item[gobnilp/outputfile/pedigree] See Section~\ref{sec:output}.
+\begin{verbatim}
+# where the pedigree representation of the BN should be output
+# [type: string, default: ""]
+gobnilp/outputfile/pedigree = ""
+\end{verbatim}
+\item[gobnilp/outputfile/scoreandtime] See Section~\ref{sec:output}.
+\begin{verbatim}
+# where the score of and time to find the BN should be output
+# [type: string, default: ""]
+gobnilp/outputfile/scoreandtime = ""
+\end{verbatim}
+\item[gobnilp/outputfile/scores] See Section~\ref{sec:output}.
+\begin{verbatim}
+# file which parent set scores should be output (stdout for standard out, empty string for nowhere)
+# [type: string, default: ""]
+gobnilp/outputfile/scores = ""
+\end{verbatim}
+\item[gobnilp/outputfile/solution] See Section~\ref{sec:output}.
+\begin{verbatim}
+# where the resulting Bayesian network should be output
+# [type: string, default: "stdout"]
+gobnilp/outputfile/solution = "stdout"
+\end{verbatim}
+\item[gobnilp/printbranchingstatistics] See Section~\ref{sec:analysis}
+\begin{verbatim}
+# whether to print variable branching statistics
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+\end{verbatim}
+\item[gobnilp/printmecinfo] See Section~\ref{sec:output}.
+\begin{verbatim}
+# whether to print edges in the undirected skeleton and any immoralities
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/printmecinfo = FALSE
+\end{verbatim}
+\item[gobnilp/printparameters] See Section~\ref{sec:output}.
+\begin{verbatim}
+# whether to print parameters not at default values
+# [type: bool, range: {TRUE,FALSE}, default: TRUE]
+gobnilp/printparameters = TRUE
+\end{verbatim}
+\item[gobnilp/printscipsol] See Section~\ref{sec:output}.
+\begin{verbatim}
+# whether to (additionally) print BNs in SCIP solution format
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/printscipsol = FALSE
+\end{verbatim}
+\item[gobnilp/printstatistics] See Section~\ref{sec:analysis}
+\begin{verbatim}
+# whether to print solving statistics
+# [type: bool, range: {TRUE,FALSE}, default: FALSE]
+gobnilp/printstatistics = FALSE
+\end{verbatim}
+\item[gobnilp/statisticsfile] See Section~\ref{sec:analysis}
+\begin{verbatim}
+# file for statistics
+# [type: string, default: ""]
+gobnilp/statisticsfile = ""
+\end{verbatim}
+% \item[gobnilp/sosnparents] english
+% \begin{verbatim}
+% # whether to do SOS1 branching on number of parents
+% # [type: bool, range: {TRUE,FALSE}, default: FALSE]
+% gobnilp/sosnparents = FALSE
+% \end{verbatim}
+% \item[gobnilp/sosscores] english
+% \begin{verbatim}
+% # whether to do SOS1 branching on scores
+% # [type: bool, range: {TRUE,FALSE}, default: FALSE]
+% gobnilp/sosscores = FALSE
+% \end{verbatim}
+\end{description}
+
+% \subsection{\gobnilp{} plugin parameters}
+%  In the current version of
+% \gobnilp{} there are two plugins: \verb+heur_sinks.c+ which provides a
+% heuristic for finding primal solutions (i.e.\ BNs) and
+% \verb+cons_dagcluster.c+ which provides a constraint that BNs are
+% acyclic. ( The key cutting plane algorithm
+% \cite{cussens11:_bayes_networ_learn_cuttin_planes} is implemented as the
+% separator method for this constraint. )
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Convex4 cuts}
+\label{sec:convex4}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4b inequalities}
+\label{sec:convex4b}
+
+\subsection{Example convex4b inequality}
+\label{sec:4bex}
+
+\begin{eqnarray}
+  \label{eq:convex4bex0}
+  \fv{0}{\{1,3\}} + \fv{0}{\{2,3\}} + \fv{0}{\{ 1,2,3\}} && \nonumber \\
+  + \fv{1}{\{2\}} + \fv{1}{\{0,2\}} + \fv{1}{\{ 0,3\}} + \fv{1}{\{2,3\}}
+  + \fv{1}{\{0,2,3\}} && \nonumber \\
+  + \fv{2}{\{1\}}+\fv{2 }{\{ 0,1\}}+\fv{2 }{\{ 0,3\}}+\fv{2 }{\{ 1,3\}}+\fv{2 }{\{ 0,1,3\}}&& \nonumber \\
+  + \fv{3}{\{0,1\}}+\fv{3 }{\{ 0,2\}}+\fv{3 }{\{ 0,1,2\}}
+&  \leq & 2 \nonumber \\
+\end{eqnarray}
+
+\subsection{General form of the  convex4b inequality}
+\label{sec:4bgen}
+
+\begin{eqnarray}
+  \label{eq:convex4b}
+\sum_{v_{3}\in\varsubset\wedge\{v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{v_{2}\in\varsubset \vee \{v_{0},v_{3}\}\subseteq\varsubset}\fv{v_{1}}{\varsubset} && \nonumber \\
++
+\sum_{v_{1}\in\varsubset \vee \{v_{0},v_{3}\}\subseteq\varsubset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{v_{0}\in\varsubset\wedge\{v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{3}}{\varsubset}
+  & \leq & 2\nonumber \\
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4c inequalities}
+\label{sec:convex4c}
+
+\subsection{Example convex4c inequality}
+\label{sec:4cex}
+
+\begin{eqnarray}
+  \label{eq:convex4cex0}
+  \fv{0}{\{1,3\}} + \fv{0}{\{2,3\}} + \fv{0}{\{ 1,2,3\}} && \nonumber \\
+  + \fv{1}{\{0\}} + \fv{1}{\{2\}} + \fv{1}{\{ 0,2\}} + \fv{1}{\{0,3\}}
+  + \fv{1}{\{2,3\}} + \fv{1}{\{0,2,3\}} && \nonumber \\
+  + \fv{2 }{\{ 0,3\}}+\fv{2 }{\{ 1,3\}}+\fv{2 }{\{ 0,1,3\}}&& \nonumber \\
+  + \fv{3 }{\{ 0,2\}}+\fv{3 }{\{ 0,1,2\}}
+&  \leq & 2 \nonumber \\
+\end{eqnarray}
+
+\subsection{General form of the  convex4c inequality}
+\label{sec:4cgen}
+
+\begin{eqnarray}
+  \label{eq:convex4c}
+\sum_{v_{3}\in\varsubset\wedge\{v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{\{v_{0},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{1}}{\varsubset} && \nonumber \\
++
+\sum_{v_{3}\in\varsubset\wedge\{v_{0},v_{1}\}\cap\varsubset\neq\emptyset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{\{v_{0},v_{2}\}\subseteq\varsubset} \fv{v_{3}}{\varsubset}
+  & \leq & 2\nonumber \\
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4d inequalities}
+\label{sec:convex4d}
+
+\subsection{Example convex4d inequality}
+\label{sec:4dex}
+
+
+\begin{small}
+\begin{eqnarray}
+  \label{eq:convex4dex0}
+  \fv{0}{\{3\}} + \fv{0}{\{1,3\}} + \fv{0}{\{2,3\}} +
+  \fv{0}{\{1,2,3\}} && \nonumber \\
+  + \fv{1}{\{0\}} + \fv{1}{\{2\}} + \fv{1}{\{3\}} + \fv{1}{\{0,2\}} +
+  \fv{1}{\{0,3\}} + \fv{1}{\{2,3\}} + \fv{1}{\{0,2,3\}} && \nonumber \\
+  + \fv{2}{\{3\}} + \fv{2}{\{0,3\}} + \fv{2}{\{1,3\}} +
+  \fv{2}{\{0,1,3\}} && \nonumber \\
+  + \fv{3}{\{0\}} + \fv{3}{\{1\}} + \fv{3}{\{2\}} + \fv{3}{\{0,1\}} +
+  2\fv{3}{\{0,2\}} + \fv{3}{\{1,2\}} + 2\fv{3}{\{ 0,1,2\}} && \nonumber \\
+  \leq 3 &&  \nonumber \\
+\end{eqnarray}
+\end{small}
+\subsection{General form of the  convex4d inequality}
+\label{sec:4dgen}
+
+\begin{eqnarray}
+  \label{eq:convex4d}
+\sum_{v_{3}\in\varsubset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{\{v_{0},v_{2},v_{3}\}\cap\varsubset\neq\emptyset}\fv{v_{1}}{\varsubset} && \nonumber \\
++
+\sum_{v_{3}\in\varsubset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{\{v_{0},v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{3}}{\varsubset}
++ \sum_{\{v_{0},v_{2}\}\subseteq\varsubset}\fv{v_{3}}{\varsubset}
+  & \leq & 3\nonumber \\
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4e inequalities}
+\label{sec:convex4e}
+
+\subsection{Example convex4e inequality}
+\label{sec:4eex}
+
+\begin{eqnarray}
+  \label{eq:convex4eex0}
+  \fv{0}{\{1,2\}}+\fv{0}{\{1,3\}}+\fv{0}{\{2,3\}}+2\fv{0}{\{1,2,3\}}
+  && \nonumber \\
+  +\fv{1}{\{0,2\}}+\fv{1}{\{0,3\}}+\fv{1}{\{0,2,3\}} && \nonumber \\
+  +\fv{2}{\{0,1\}}+\fv{2}{\{0,3\}}+\fv{2}{\{0,1,3\}} && \nonumber \\
+  +\fv{3}{\{0,1\}}+\fv{3}{\{0,2\}}+\fv{3}{\{0,1,2\}} & \leq & 2
+  \nonumber \\
+\end{eqnarray}
+
+\subsection{General form of the  convex4e inequality}
+\label{sec:4egen}
+
+\begin{eqnarray}
+  \label{eq:convex4e}
+\sum_{|\{v_{1},v_{2},v_{3}\}\cap\varsubset|\geq 2}\fv{v_{0}}{\varsubset} +  \sum_{\{v_{1},v_{2},v_{3}\}\subseteq\varsubset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{v_{0} \in \varsubset \wedge \{v_{2},v_{3}\}\cap\varsubset \neq \emptyset}\fv{v_{1}}{\varsubset} && \nonumber \\
++
+\sum_{v_{0} \in \varsubset \wedge \{v_{1},v_{3}\}\cap\varsubset \neq \emptyset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{v_{0} \in \varsubset \wedge \{v_{1},v_{2}\}\cap\varsubset \neq \emptyset}\fv{v_{3}}{\varsubset}
+  & \leq & 2\nonumber \\
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4f inequalities}
+\label{sec:convex4f}
+
+\subsection{Example convex4f inequality}
+\label{sec:4fex}
+
+\begin{eqnarray}
+  \label{eq:convex4fex0}
+  \fv{0}{\{2,3\}}+\fv{0}{\{1,2,3\}} && \nonumber \\
+  +\fv{1}{\{2\}}+\fv{1}{\{3\}}+\fv{1}{\{0,2\}}+\fv{1}{\{0,3\}}+\fv{1}{\{2,3\}}+\fv{1}{\{0,2,3\}} && \nonumber \\
+  +\fv{2}{\{0,1\}}+\fv{2}{\{0,3\}}+\fv{2}{\{0,1,3\}} && \nonumber \\
+  +\fv{3}{\{0,1\}}+\fv{3}{\{0,2\}}+\fv{3}{\{0,1,2\}}&& \nonumber \\
+  &\leq &2 \nonumber \\
+\end{eqnarray}
+
+
+\subsection{General form of the  convex4f inequality}
+\label{sec:4fgen}
+
+\begin{eqnarray}
+  \label{eq:convex4f}
+\sum_{\{v_{2},v_{3}\}\subseteq\varsubset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{\{v_{2},v_{3}\}\cap\varsubset\neq\emptyset}\fv{v_{1}}{\varsubset} && \nonumber \\
++
+\sum_{v_{0}\in\varsubset\wedge \{v_{1},v_{3}\}\cap\varsubset\neq\emptyset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{v_{0}\in\varsubset\wedge \{v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{3}}{\varsubset}
+  & \leq & 2\nonumber \\
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4g inequalities}
+\label{sec:convex4g}
+
+\subsection{Example convex4g inequality}
+\label{sec:4gex}
+\begin{small}
+\begin{eqnarray}
+  \label{eq:convex4gex0}
+  \fv{0}{\{1\}}+\fv{0}{\{2\}}+\fv{0}{\{1,2\}}+\fv{0}{\{1,3\}}+\fv{0}{\{2,3\}}+2\fv{0}{\{1,2,3\}}&& \nonumber \\
+  +\fv{1}{\{0\}}+\fv{1}{\{2\}}+\fv{1}{\{3\}}+\fv{1}{\{0,2\}}+2\fv{1}{\{0,3\}}+\fv{1}{\{2,3\}}+2\fv{1}{\{0,2,3\}}&& \nonumber \\
+  +\fv{2}{\{0\}}+\fv{2}{\{0,1\}}+\fv{2}{\{0,3\}}+\fv{2}{\{0,1,3\}}&& \nonumber \\
+  +\fv{3}{\{0,1\}}+\fv{3}{\{0,1,2\}}&& \nonumber \\
+\leq  3 &&\nonumber \\
+\end{eqnarray}
+
+\end{small}
+
+
+\subsection{General form of the  convex4g inequality}
+\label{sec:4ggen}
+
+\begin{eqnarray}
+  \label{eq:convex4g}
+\sum_{\{v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{0}}{\varsubset}
++ \sum_{\{v_{1},v_{2},v_{3}\}\subseteq\varsubset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{\{v_{0},v_{2},v_{3}\}\cap\varsubset\neq\emptyset}\fv{v_{1}}{\varsubset}
++
+\sum_{\{v_{0},v_{3}\}\subseteq\varsubset}\fv{v_{1}}{\varsubset} && \nonumber \\
++
+\sum_{v_{0}\in\varsubset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{\{v_{0},v_{1}\}\subseteq\varsubset}\fv{v_{3}}{\varsubset}
+  & \leq & 3\nonumber \\
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Convex4h inequalities}
+\label{sec:convex4h}
+
+\subsection{Example convex4h inequality}
+\label{sec:4hex}
+\begin{eqnarray}
+  \label{eq:convex4hex0}
+   \fv{0}{\{1,2,3\}} && \nonumber \\
+  +\fv{1}{\{0,3\}}+\fv{1}{\{0,2,3\}}  && \nonumber \\
+  +\fv{2}{\{0,3\}}+\fv{2}{\{0,1,3\}}  && \nonumber \\
++  \fv{3}{\{1\}}+\fv{3}{\{2\}}+\fv{3}{\{1,2\}}+\fv{3}{\{0,1\}}+\fv{3}{\{0,2\}}+2\fv{3}{\{0,1,2\}} && \nonumber \\
+& \leq & 2 \nonumber \\
+\end{eqnarray}
+
+
+
+\subsection{General form of the  convex4h inequality}
+\label{sec:4hgen}
+
+\begin{eqnarray}
+  \label{eq:convex4h}
+\sum_{\{v_{1},v_{2},v_{3}\}\subseteq\varsubset}\fv{v_{0}}{\varsubset}
+&& \nonumber \\
+ +
+\sum_{\{v_{0},v_{3}\}\subseteq\varsubset}\fv{v_{1}}{\varsubset}
+&& \nonumber \\
++
+\sum_{\{v_{0},v_{3}\}\subseteq\varsubset}\fv{v_{2}}{\varsubset} && \nonumber \\
++
+\sum_{\{v_{1},v_{2}\}\cap\varsubset\neq\emptyset}\fv{v_{3}}{\varsubset}
++ \sum_{\{v_{0},v_{1},v_{2}\}\subseteq\varsubset}\fv{v_{3}}{\varsubset}
+  & \leq & 2 \nonumber \\
+\end{eqnarray}

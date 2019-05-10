@@ -1,0 +1,1097 @@
+19,20c19,20
+< /**@file   cons_lop.c
+<  * @brief  example constraint handler for linear ordering constraints
+---
+> /**@file   cons_partialordering.c
+>  * @brief  example constraint handler for partial ordering constraints
+21a22
+>  * @author James Cussens
+23,25c24,29
+<  * We handle the following system of linear constraints:
+<  * - \f$ x_{ij} + x_{ji} = 1 \f$            (symmetry equations - added initially)
+<  * \f$ x_{ij} + x_{jk} + x_{ki} \leq 2 \f$  (triangle inequalities)
+---
+>  * We handle the following system of partial constraints:
+>  * - \f$ x_{ij} + x_{ji} \leq 1 \f$         (symmetry inequalities - added initially)
+>  * \f$ x_{ij} + x_{jk} - x_{ik} \leq 1 \f$  (triangle inequalities)
+>  *
+>  * The partial order must be consistent with the arrow variables which are also in the constraint
+>  * If minimal=TRUE, the partial order must be the minimal one consistent with the arrows (ie the ancestor relation)
+30c34,36
+< #include "cons_lop.h"
+---
+> #include <cons_partialordering.h>
+> #include "utils.h"
+> #include "parent_set_data.h"
+37,38c43,44
+< #define CONSHDLR_NAME          "lop"
+< #define CONSHDLR_DESC          "linear ordering constraint handler"
+---
+> #define CONSHDLR_NAME          "partialordering"
+> #define CONSHDLR_DESC          "partial ordering constraint handler"
+40c46
+< #define CONSHDLR_ENFOPRIORITY      -100 /**< priority of the constraint handler for constraint enforcing */
+---
+> #define CONSHDLR_ENFOPRIORITY      -200 /**< priority of the constraint handler for constraint enforcing */
+53c59
+< /** constraint data for linear ordering constraints */
+---
+> /** constraint data for partial ordering constraints */
+57c63,65
+<    SCIP_VAR***           vars;               /**< variables */
+---
+>    SCIP_VAR***           vars;               /**< partial order variables */
+>    ParentSetData*        psd;                /**< contains arrow and parent set variables */
+>    SCIP_Bool             minimal;            /**< whether the partial order must minimal while being consistent with arrows */
+63c71
+< SCIP_RETCODE LOPseparate(
+---
+> SCIP_RETCODE PartialOrderingSeparate(
+94,95c102,103
+< 	 /* if symmetry equations are violated - should not be the case, if they are added in the beginning */
+< 	 if ( ! SCIPisFeasEQ(scip, valIJ + SCIPgetSolVal(scip, sol, vars[j][i]), 1.0) )
+---
+> 	 /* if symmetry inequalities are violated - should not be the case, if they are added in the beginning */
+> 	 if ( ! SCIPisFeasLE(scip, valIJ + SCIPgetSolVal(scip, sol, vars[j][i]), 1.0) )
+101c109
+< 	    SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, 1.0, 1.0, FALSE, FALSE, TRUE) );
+---
+> 	    SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 1.0, FALSE, FALSE, TRUE) );
+120,121c128
+< 	    SCIP_Real sum;
+< 
+---
+> 	    SCIP_Real sum = 0.0;
+125c132
+< 	    sum = valIJ + SCIPgetSolVal(scip, sol, vars[j][k]) + SCIPgetSolVal(scip, sol, vars[k][i]);
+---
+> 	    sum = valIJ + SCIPgetSolVal(scip, sol, vars[j][k]) - SCIPgetSolVal(scip, sol, vars[i][k]);
+127,128c134,135
+< 	    /* if sum - 2.0 > 0, i.e., the cut is violated */
+< 	    if ( SCIPisEfficacious(scip, sum - 2.0) )
+---
+> 	    /* if sum - 1.0 > 0, i.e., the cut is violated */
+> 	    if ( SCIPisEfficacious(scip, sum - 1.0) )
+134c141
+< 	       SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 2.0, FALSE, FALSE, TRUE) );
+---
+> 	       SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 1.0, FALSE, FALSE, TRUE) );
+138c145
+< 	       SCIP_CALL( SCIPaddVarToRow(scip, row, vars[k][i], 1.0) );
+---
+> 	       SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][k], -1.0) );
+160c167
+< SCIP_DECL_CONSHDLRCOPY(conshdlrCopyLOP)
+---
+> SCIP_DECL_CONSHDLRCOPY(conshdlrCopyPartialOrdering)
+168c175
+<    SCIP_CALL( SCIPincludeConshdlrLOP(scip) );
+---
+>    SCIP_CALL( SCIPincludeConshdlrPartialOrdering(scip) );
+177c184
+< SCIP_DECL_CONSDELETE(consDeleteLOP)
+---
+> SCIP_DECL_CONSDELETE(consDeletePartialOrdering)
+190c197
+<    SCIPdebugMsg(scip, "deleting linear ordering constraint <%s>.\n", SCIPconsGetName(cons));
+---
+>    SCIPdebugMsg(scip, "deleting partial ordering constraint <%s>.\n", SCIPconsGetName(cons));
+192a200,201
+>    SCIP_CALL( PS_deallocateParentSetData(scip, &((*consdata)->psd), FALSE) );
+> 
+201,285d209
+< /** deinitialization method of constraint handler (called before transformed problem is freed)
+<  *
+<  *  We output the final linear ordering.
+<  */
+< static
+< SCIP_DECL_CONSEXIT(consExitLOP)
+< {  /*lint --e{715}*/
+<    SCIP_SOL* sol;
+<    int c;
+<    int i;
+<    int j;
+<    int n;
+< 
+<    assert( scip != NULL );
+<    assert( conshdlr != NULL );
+<    assert( strcmp(SCIPconshdlrGetName(conshdlr), CONSHDLR_NAME) == 0 );
+< 
+<    SCIPdebugMsg(scip, "exiting linear ordering constraint handler <%s>.\n", SCIPconshdlrGetName(conshdlr));
+< 
+<    /* avoid output for subscips */
+<    if ( SCIPgetSubscipDepth(scip) > 0 )
+<       return SCIP_OKAY;
+< 
+<    /* get best solution */
+<    sol = SCIPgetBestSol(scip);
+<    if ( sol == NULL )
+<       return SCIP_OKAY;
+< 
+<    /* loop through all constraints */
+<    for (c = 0; c < nconss; ++c)
+<    {
+<       SCIP_CONSDATA* consdata;
+<       SCIP_VAR*** vars;
+<       int* outdeg;
+<       int* indices;
+< 
+<       assert( conss != NULL );
+<       assert( conss[c] != NULL );
+<       SCIPdebugMsg(scip, "solution for for linear ordering constraint <%s>.\n", SCIPconsGetName(conss[c]));
+< 
+<       consdata = SCIPconsGetData(conss[c]);
+<       assert( consdata != NULL );
+<       assert( consdata->vars != NULL );
+<       n = consdata->n;
+<       vars = consdata->vars;
+< 
+<       SCIP_CALL( SCIPallocBufferArray(scip, &outdeg, n) );
+<       SCIP_CALL( SCIPallocBufferArray(scip, &indices, n) );
+< 
+<       /* compute out-degree */
+<       for (i = 0; i < n; ++i)
+<       {
+< 	 int deg = 0;
+< 	 for (j = 0; j < n; ++j)
+< 	 {
+< 	    SCIP_Real val;
+< 
+< 	    if (j == i)
+< 	       continue;
+< 
+< 	    val = SCIPgetSolVal(scip, sol, vars[i][j]);
+< 	    assert( SCIPisFeasIntegral(scip, val) );
+< 	    if ( val < 0.5 )
+< 	       ++deg;
+< 	 }
+< 	 outdeg[i] = deg;
+< 	 indices[i] = i;
+<       }
+< 
+<       /* sort such that degrees are non-decreasing */
+<       SCIPsortIntInt(outdeg, indices, n);
+< 
+<       /* output */
+<       SCIPinfoMessage(scip, NULL, "\nFinal order of linear ordering constraint <%s>:\n", SCIPconsGetName(conss[c]));
+<       for (i = 0; i < n; ++i)
+< 	 SCIPinfoMessage(scip, NULL, "%d ", indices[i]);
+<       SCIPinfoMessage(scip, NULL, "\n");
+< 
+<       SCIPfreeBufferArray(scip, &indices);
+<       SCIPfreeBufferArray(scip, &outdeg);
+<    }
+< 
+<    return SCIP_OKAY;
+< }
+< 
+288c212
+< SCIP_DECL_CONSTRANS(consTransLOP)
+---
+> SCIP_DECL_CONSTRANS(consTransPartialOrdering)
+293a218
+>    int k;
+296a222,227
+>    SCIP_Bool minimal;
+>    ParentSetData* targetpsd;
+> 
+>    SCIP_VAR* arrow_var;
+>    SCIP_VAR* new_arrow_var;
+>    
+303c234
+<    SCIPdebugMsg(scip, "transforming linear ordering constraint <%s>.\n", SCIPconsGetName(sourcecons) );
+---
+>    SCIPdebugMsg(scip, "transforming partial ordering constraint <%s>.\n", SCIPconsGetName(sourcecons) );
+314a246,257
+>    minimal = sourcedata->n;
+>    consdata->minimal = minimal;
+> 
+>    /* copy parent set data, but does not create new variables */
+>    SCIP_CALL( PS_copyParentSetData(scip, sourcedata->psd, &targetpsd) );
+>    /* have to reinitiaise hashtable for edges and arrows since new variables
+>       will be inserted using put_arrow (see below) */
+>    SCIP_CALL( hashtablefreeArrow(scip, targetpsd) );
+>    SCIP_CALL( hashtableCreateArrow(scip, targetpsd) );
+> 
+>    consdata->psd = targetpsd;
+> 
+326c269,278
+< 	 }
+---
+> 
+>             arrow_var = get_arrow(sourcedata->psd,i,j);
+>             if( arrow_var != NULL )
+>             {
+>                SCIP_CALL( SCIPgetTransformedVar(scip, arrow_var, &new_arrow_var) );
+>                put_arrow(scip, consdata->psd, i, j, new_arrow_var);
+>             }
+>          }
+>          for( k = 0; k < sourcedata->psd->nParentSets[i]; k++ )            
+>             SCIP_CALL( SCIPgetTransformedVar(scip, sourcedata->psd->PaVars[i][k], &(consdata->psd->PaVars[i][k])) );
+342a295
+> 
+345c298
+< SCIP_DECL_CONSINITLP(consInitlpLOP)
+---
+> SCIP_DECL_CONSINITLP(consInitlpPartialOrdering)
+364c317,319
+< 
+---
+>       ParentSetData*  psd;
+>       SCIP_VAR* arrow_var;
+>       
+367c322
+<       SCIPdebugMsg(scip, "adding initial rows for linear ordering constraint <%s>.\n", SCIPconsGetName(conss[c]));
+---
+>       SCIPdebugMsg(scip, "adding initial rows for partial ordering constraint <%s>.\n", SCIPconsGetName(conss[c]));
+373a329
+>       psd = consdata->psd;
+378c334
+< 	 for (j = i+1; j < n; ++j)
+---
+> 	 for (j = 0; j < n; ++j)
+380c336,359
+< 	    SCIP_ROW* row;
+---
+>             SCIP_ROW* row;
+>             
+>             if( j == i )
+>                continue;
+>             
+>             if( j > i )
+>             {
+>                (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "sym#%d#%d", i, j);
+>                SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 1.0, FALSE, FALSE, FALSE) );
+>                SCIP_CALL( SCIPcacheRowExtensions(scip, row) );
+>                SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][j], 1.0) );
+>                SCIP_CALL( SCIPaddVarToRow(scip, row, vars[j][i], 1.0) );
+>                SCIP_CALL( SCIPflushRowExtensions(scip, row) );
+> #ifdef SCIP_DEBUG
+>                SCIPdebug( SCIProwPrint(row, NULL) );
+> #endif
+>                SCIP_CALL( SCIPaddRow(scip, row, FALSE, infeasible) );
+>                SCIP_CALL( SCIPreleaseRow(scip, &row));
+>                ++nGen;
+>                
+>                /* cannot handle infeasible case here - just exit */
+>                if ( *infeasible )
+>                   return SCIP_OKAY;
+>             }
+382,387c361,372
+< 	    (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "sym#%d#%d", i, j);
+< 	    SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, 1.0, 1.0, FALSE, FALSE, FALSE) );
+< 	    SCIP_CALL( SCIPcacheRowExtensions(scip, row) );
+< 	    SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][j], 1.0) );
+< 	    SCIP_CALL( SCIPaddVarToRow(scip, row, vars[j][i], 1.0) );
+< 	    SCIP_CALL( SCIPflushRowExtensions(scip, row) );
+---
+>             /* parents are ancestors */
+> 
+>             arrow_var = get_arrow(psd,i,j);
+>             if( arrow_var == NULL )
+>                continue;
+>             
+>             (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "paisanc#%d#%d", i, j);
+>             SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 0.0, FALSE, FALSE, FALSE) );
+>             SCIP_CALL( SCIPcacheRowExtensions(scip, row) );
+>             SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][j], -1.0) );
+>             SCIP_CALL( SCIPaddVarToRow(scip, row, arrow_var, 1.0) );
+>             SCIP_CALL( SCIPflushRowExtensions(scip, row) );
+398c383
+< 	 }
+---
+>          }
+408c393
+< SCIP_DECL_CONSSEPALP(consSepalpLOP)
+---
+> SCIP_DECL_CONSSEPALP(consSepalpPartialOrdering)
+430c415
+<       SCIPdebugMsg(scip, "separating LP solution for linear ordering constraint <%s>.\n", SCIPconsGetName(cons));
+---
+>       SCIPdebugMsg(scip, "separating LP solution for partial ordering constraint <%s>.\n", SCIPconsGetName(cons));
+436c421
+<       SCIP_CALL( LOPseparate(scip, conshdlr, consdata->n, consdata->vars, NULL, &nGen, &cutoff) );
+---
+>       SCIP_CALL( PartialOrderingSeparate(scip, conshdlr, consdata->n, consdata->vars, NULL, &nGen, &cutoff) );
+452c437
+< SCIP_DECL_CONSSEPASOL(consSepasolLOP)
+---
+> SCIP_DECL_CONSSEPASOL(consSepasolPartialOrdering)
+474c459
+<       SCIPdebugMsg(scip, "separating solution for linear ordering constraint <%s>.\n", SCIPconsGetName(cons));
+---
+>       SCIPdebugMsg(scip, "separating solution for partial ordering constraint <%s>.\n", SCIPconsGetName(cons));
+480c465
+<       SCIP_CALL( LOPseparate(scip, conshdlr, consdata->n, consdata->vars, sol, &nGen, &cutoff) );
+---
+>       SCIP_CALL( PartialOrderingSeparate(scip, conshdlr, consdata->n, consdata->vars, sol, &nGen, &cutoff) );
+495c480
+< SCIP_DECL_CONSENFOLP(consEnfolpLOP)
+---
+> SCIP_DECL_CONSENFOLP(consEnfolpPartialOrdering)
+519c504,506
+< 
+---
+>       ParentSetData* psd;
+>       SCIP_Bool minimal;
+>       
+522c509
+<       SCIPdebugMsg(scip, "enforcing lp solution for linear ordering constraint <%s>.\n", SCIPconsGetName(cons));
+---
+>       SCIPdebugMsg(scip, "enforcing lp solution for partial ordering constraint <%s>.\n", SCIPconsGetName(cons));
+528a516,517
+>       psd = consdata->psd;
+>       minimal = consdata->minimal;
+535a525,526
+>             SCIP_VAR* arrow_i_j;
+> 
+539a531,588
+>             arrow_i_j = get_arrow(psd, i, j);
+> 
+>             /* if parents are not ancestors - should not be the case, if they are added in the beginning */
+> 	    if ( arrow_i_j != NULL && !SCIPisFeasGE(scip, valIJ, SCIPgetSolVal(scip, NULL, arrow_i_j)) )
+>             {
+> 	       SCIP_ROW *row;
+>                SCIP_Bool infeasible;
+> 
+> 	       (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "paisanc#%d#%d", i, j);
+> 
+> 	       SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 0.0, FALSE, FALSE, TRUE) );
+> 	       SCIP_CALL( SCIPcacheRowExtensions(scip, row) );
+>                SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][j], -1.0) );
+>                SCIP_CALL( SCIPaddVarToRow(scip, row, arrow_i_j, 1.0) );
+> 	       SCIP_CALL( SCIPflushRowExtensions(scip, row) );
+> #ifdef SCIP_DEBUG
+> 	       SCIPdebug( SCIProwPrint(row, NULL) );
+> #endif
+> 	       SCIP_CALL( SCIPaddRow(scip, row, FALSE, &infeasible) );
+> 	       SCIP_CALL( SCIPreleaseRow(scip, &row));
+> 	       ++nGen;
+> 
+>                if ( infeasible )
+>                {
+>                   *result = SCIP_CUTOFF;
+>                   return SCIP_OKAY;
+>                }
+>             }
+> 
+>             if( minimal && SCIPisFeasGT(scip, valIJ, 0.0) )
+>             {
+>                /* must have e.g. (1- I(1<-{2,3})) + I(2<--4) + I(3<--4) + (1-(I(1<--4)) >= 1 */
+>                for( k = 0; k < psd->nParentSets[i]; k++ )
+>                {
+>                   SCIP_Real acc;
+>                   int l;
+>                   int pa = -1;
+>                   
+>                   acc = (1.0 - valIJ) + (1 - SCIPgetSolVal(scip, NULL, psd->PaVars[i][k]));
+> 
+>                   if( SCIPisFeasGE(scip, acc, 1.0) )
+>                      continue;
+> 
+>                   for( l = 0; l < psd->nParents[i][k] && SCIPisFeasLT(scip, acc, 1.0); l++ )
+>                   {
+>                      pa = psd->ParentSets[i][k][l];
+>                      if( pa == j )
+>                         break;
+>                      acc += SCIPgetSolVal(scip, NULL, vars[psd->ParentSets[i][k][l]][j]);
+>                   }
+> 
+>                   if( pa == j)
+>                      continue;
+>                   
+>                   if( SCIPisFeasLT(scip, acc, 1.0) )
+>                   {
+>                      SCIP_ROW *row;
+>                      SCIP_Bool infeasible;
+540a590,614
+>                      (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "minim#%d#%d#%d", i, j, k);
+> 
+>                      SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -1.0, SCIPinfinity(scip), FALSE, FALSE, TRUE) );
+>                      SCIP_CALL( SCIPcacheRowExtensions(scip, row) );
+>                      SCIP_CALL( SCIPaddVarToRow(scip, row, psd->PaVars[i][k], -1.0) );
+>                      SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][j], -1.0) );
+>                      for( l = 0; l < psd->nParents[i][k]; l++ )
+>                         SCIP_CALL( SCIPaddVarToRow(scip, row, vars[psd->ParentSets[i][k][l]][j], 1.0) );
+>                      SCIP_CALL( SCIPflushRowExtensions(scip, row) );
+> #ifdef SCIP_DEBUG
+>                      SCIPdebug( SCIProwPrint(row, NULL) );
+> #endif
+>                      SCIP_CALL( SCIPaddRow(scip, row, FALSE, &infeasible) );
+>                      SCIP_CALL( SCIPreleaseRow(scip, &row));
+>                      ++nGen;
+> 
+>                      if ( infeasible )
+>                      {
+>                         *result = SCIP_CUTOFF;
+>                         return SCIP_OKAY;
+>                      }
+>                   }
+>                }
+>             }
+>             
+542c616
+< 	    if ( ! SCIPisFeasEQ(scip, 1.0 - valIJ, SCIPgetSolVal(scip, NULL, vars[j][i])) )
+---
+> 	    if ( ! SCIPisFeasGE(scip, 1.0 - valIJ, SCIPgetSolVal(scip, NULL, vars[j][i])) )
+549c623
+< 	       SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, 1.0, 1.0, FALSE, FALSE, TRUE) );
+---
+> 	       SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 1.0, FALSE, FALSE, TRUE) );
+571,572c645
+< 	       SCIP_Real sum;
+< 
+---
+> 	       SCIP_Real sum = 0.0;
+576c649
+< 	       sum = valIJ + SCIPgetSolVal(scip, NULL, vars[j][k]) + SCIPgetSolVal(scip, NULL, vars[k][i]);
+---
+> 	       sum = valIJ + SCIPgetSolVal(scip, NULL, vars[j][k]) - SCIPgetSolVal(scip, NULL, vars[i][k]);
+578,579c651,652
+< 	       /* if sum > 2.0, i.e., the cut is violated */
+< 	       if ( SCIPisFeasGT(scip, sum, 2.0) ) /* this is the only difference to the separation call */
+---
+> 	       /* if sum > 1.0, i.e., the cut is violated */
+> 	       if ( SCIPisFeasGT(scip, sum, 1.0) ) /* this is the only difference to the separation call */
+586c659
+< 		  SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 2.0, FALSE, FALSE, TRUE) );
+---
+> 		  SCIP_CALL( SCIPcreateEmptyRowCons(scip, &row, conshdlr, s, -SCIPinfinity(scip), 1.0, FALSE, FALSE, TRUE) );
+590c663
+< 		  SCIP_CALL( SCIPaddVarToRow(scip, row, vars[k][i], 1.0) );
+---
+> 		  SCIP_CALL( SCIPaddVarToRow(scip, row, vars[i][k], -1.0) );
+614c687
+<    SCIPdebugMsg(scip, "all linear ordering constraints are feasible.\n");
+---
+>    SCIPdebugMsg(scip, "all partial ordering constraints are feasible.\n");
+621c694
+< SCIP_DECL_CONSENFOPS(consEnfopsLOP)
+---
+> SCIP_DECL_CONSENFOPS(consEnfopsPartialOrdering)
+641c714,715
+< 
+---
+>       ParentSetData* psd;
+>       
+644c718
+<       SCIPdebugMsg(scip, "enforcing pseudo solution for linear ordering constraint <%s>.\n", SCIPconsGetName(cons));
+---
+>       SCIPdebugMsg(scip, "enforcing pseudo solution for partial ordering constraint <%s>.\n", SCIPconsGetName(cons));
+651c725,726
+< 
+---
+>       psd = consdata->psd;
+>       
+657a733,735
+>             SCIP_Bool onearrowIJ;
+>             SCIP_VAR* arrow_i_j;
+> 
+663d740
+< 	    assert( SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, NULL, vars[j][i])) );
+664a742,793
+>             
+>             arrow_i_j = get_arrow(psd, i, j);
+>             
+>             /* the priorities should ensure that the solution is integral */
+>             assert( arrow_i_j == NULL || SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, NULL, arrow_i_j)) );
+> 
+>             onearrowIJ = ( arrow_i_j != NULL && SCIPisGT(scip, SCIPgetSolVal(scip, NULL, arrow_i_j), 0.5) );
+>             
+>             /* check that parents are partially ordered */
+>             if( onearrowIJ && !oneIJ )
+>             {
+>                SCIPdebugMsg(scip, "constraint <%s> infeasible (parent not partially ordered).\n", SCIPconsGetName(cons));
+>                *result = SCIP_INFEASIBLE;
+> 	       return SCIP_OKAY;
+> 	    }
+> 
+>             /* if need minimality and j ancestor of i then either j is a parent of i or exists k such that k parent of i, j ancestor of k */ 
+>             if( consdata->minimal && oneIJ && !onearrowIJ )
+>             {
+>                SCIP_Bool kfound = FALSE;
+>                SCIP_VAR* arrow_i_k;
+>                
+>                for (k = 0; k < n; ++k)
+>                {
+> 
+>                   if (k == i || k == j)
+>                      continue;
+> 
+>                   /* the priorities should ensure that the solution is integral */
+>                   assert( SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, NULL, vars[k][j])) );
+>                   if( !SCIPisGT(scip, SCIPgetSolVal(scip, NULL, vars[k][j]), 0.5) )
+>                      continue;
+> 
+>                   arrow_i_k = get_arrow(psd, i, k);
+>                   
+>                   /* the priorities should ensure that the solution is integral */
+>                   assert( arrow_i_k == NULL || SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, NULL, arrow_i_k)) );
+>                   if( arrow_i_k != NULL && SCIPisGT(scip, SCIPgetSolVal(scip, NULL, arrow_i_k), 0.5) )
+>                   {
+>                      kfound = TRUE;
+>                      break;
+>                   }
+>                }
+>                if( !kfound )
+>                {
+>                   SCIPdebugMsg(scip, "constraint <%s> infeasible (partial order not minimal).\n", SCIPconsGetName(cons));
+>                   *result = SCIP_INFEASIBLE;
+>                   return SCIP_OKAY;
+>                }
+>             }
+> 
+> 	    assert( SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, NULL, vars[j][i])) );
+675c804
+< 	       SCIP_Bool oneJK, oneKI;
+---
+> 	       SCIP_Bool oneJK, oneIK;
+682c811
+< 	       oneKI = SCIPisGT(scip, SCIPgetSolVal(scip, NULL, vars[k][i]), 0.5);
+---
+> 	       oneIK = SCIPisGT(scip, SCIPgetSolVal(scip, NULL, vars[i][k]), 0.5);
+685c814
+< 	       if ( oneIJ && oneJK && oneKI )
+---
+> 	       if ( oneIJ && oneJK && !oneIK )
+695c824
+<    SCIPdebugMsg(scip, "all linear ordering constraints are feasible.\n");
+---
+>    SCIPdebugMsg(scip, "all partial ordering constraints are feasible.\n");
+702c831
+< SCIP_DECL_CONSCHECK(consCheckLOP)
+---
+> SCIP_DECL_CONSCHECK(consCheckPartialOrdering)
+722c851,852
+< 
+---
+>       ParentSetData* psd;
+>       
+725c855
+<       SCIPdebugMsg(scip, "checking linear ordering constraint <%s>.\n", SCIPconsGetName(cons));
+---
+>       SCIPdebugMsg(scip, "checking partial ordering constraint <%s>.\n", SCIPconsGetName(cons));
+729a860
+>       assert( consdata->psd != NULL );
+731a863
+>       psd = consdata->psd;
+733a866
+>       /* and that parents are partially ordered */
+738a872,873
+>             SCIP_Bool onearrowIJ;
+>             SCIP_VAR* arrow_i_j;
+740a876,910
+>             
+> 	    /* the priorities should ensure that the solution is integral */
+>             assert( SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, sol, vars[i][j])) );
+> 	    oneIJ = SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[i][j]), 0.5);
+> 
+>             arrow_i_j = get_arrow(psd, i, j);
+>             
+>             /* the priorities should ensure that the solution is integral */
+>             assert( arrow_i_j == NULL || SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, sol, arrow_i_j)) );
+> 
+>             onearrowIJ = ( arrow_i_j != NULL && SCIPisGT(scip, SCIPgetSolVal(scip, sol, arrow_i_j), 0.5) );
+> 
+>             /* check that parents are partially ordered */
+>             if( onearrowIJ && !oneIJ )
+>             {
+>                SCIPdebugMsg(scip, "constraint <%s> infeasible (parent not partially ordered).\n", SCIPconsGetName(cons));
+>                *result = SCIP_INFEASIBLE;
+>                if( printreason )
+>                {
+>                   SCIP_CALL( SCIPprintCons(scip, cons, NULL) );
+>                   SCIPinfoMessage(scip, NULL, "violation: parent not partially ordered <%s> = %.15g and <%s> = %.15g\n",
+>                      SCIPvarGetName(vars[i][j]), SCIPgetSolVal(scip, sol, arrow_i_j), 0.5,
+>                      SCIPvarGetName(vars[j][i]), SCIPgetSolVal(scip, sol, vars[i][j]), 0.5);
+>                }
+>                return SCIP_OKAY;
+>             }
+>             
+>             /* if need minimality and j ancestor of i then either j is a parent of i or exists k such that k parent of i, j ancestor of k */ 
+>             if( consdata->minimal && oneIJ && !onearrowIJ )
+>             {
+>                SCIP_Bool kfound = FALSE;
+>                SCIP_VAR* arrow_i_k;
+>                
+>                for (k = 0; k < n; ++k)
+>                {
+741a912,943
+>                   if (k == i || k == j)
+>                      continue;
+> 
+>                   /* the priorities should ensure that the solution is integral */
+>                   assert( SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, sol, vars[k][j])) );
+>                   if( !SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[k][j]), 0.5) )
+>                      continue;
+> 
+>                   arrow_i_k = get_arrow(psd, i, k);
+>                   
+>                   /* the priorities should ensure that the solution is integral */
+>                   assert( arrow_i_k == NULL || SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, sol, arrow_i_k)) );
+>                   if( arrow_i_k != NULL && SCIPisGT(scip, SCIPgetSolVal(scip, sol, arrow_i_k), 0.5) )
+>                   {
+>                      kfound = TRUE;
+>                      break;
+>                   }
+>                }
+>                if( !kfound )
+>                {
+>                   SCIPdebugMsg(scip, "constraint <%s> infeasible (partial order not minimal).\n", SCIPconsGetName(cons));
+>                   *result = SCIP_INFEASIBLE;
+>                   if( printreason )
+>                   {
+>                      SCIP_CALL( SCIPprintCons(scip, cons, NULL) );
+>                      SCIPinfoMessage(scip, NULL, "violation: minimality violated <%s> = %.15g\n",
+>                         SCIPvarGetName(vars[i][j]), SCIPgetSolVal(scip, sol, vars[i][j]), 0.5);
+>                   }
+>                   return SCIP_OKAY;
+>                }
+>             }
+>             
+743d944
+< 	    assert( SCIPisFeasIntegral(scip, SCIPgetSolVal(scip, sol, vars[i][j])) );
+745d945
+< 	    oneIJ = SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[i][j]), 0.5);
+748c948
+< 	    if ( oneIJ == SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[j][i]), 0.5) )
+---
+> 	    if ( oneIJ && SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[j][i]), 0.5) )
+764c964
+< 	       SCIP_Bool oneJK, oneKI;
+---
+> 	       SCIP_Bool oneJK, oneIK;
+771c971
+< 	       oneKI = SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[k][i]), 0.5);
+---
+> 	       oneIK = SCIPisGT(scip, SCIPgetSolVal(scip, sol, vars[i][k]), 0.5);
+774c974
+< 	       if ( oneIJ && oneJK && oneKI )
+---
+> 	       if ( oneIJ && oneJK && !oneIK )
+785c985
+<                         SCIPvarGetName(vars[k][i]), SCIPgetSolVal(scip, sol, vars[k][i]), 0.5);
+---
+>                         SCIPvarGetName(vars[i][k]), SCIPgetSolVal(scip, sol, vars[i][k]), 0.5);
+793c993
+<    SCIPdebugMsg(scip, "all linear ordering constraints are feasible.\n");
+---
+>    SCIPdebugMsg(scip, "all partial ordering constraints are feasible.\n");
+800c1000
+< SCIP_DECL_CONSPROP(consPropLOP)
+---
+> SCIP_DECL_CONSPROP(consPropPartialOrdering)
+818a1019
+>       SCIP_VAR* arrow_var;
+823c1024,1026
+< 
+---
+>       ParentSetData*  psd;
+>       SCIP_Bool minimal;
+>       
+836c1039,1041
+< 
+---
+>       psd = consdata->psd;
+>       minimal = consdata->minimal;
+>       
+841a1047,1048
+>             SCIP_Bool oneIJ;
+>             
+844a1052,1053
+>             oneIJ = ( SCIPvarGetLbLocal(vars[i][j]) > 0.5 );
+> 
+846c1055
+< 	    if ( SCIPvarGetLbLocal(vars[i][j]) > 0.5 )
+---
+> 	    if ( oneIJ )
+849,859c1058,1075
+< 	       SCIP_CALL( SCIPinferBinvarCons(scip, vars[j][i], FALSE, cons, i*n + j, &infeasible, &tightened) );
+< 	       if ( infeasible )
+< 	       {
+< 		  SCIPdebugMsg(scip, " -> node infeasible.\n");
+<                   SCIP_CALL( SCIPinitConflictAnalysis(scip, SCIP_CONFTYPE_PROPAGATION, FALSE) );
+<                   SCIP_CALL( SCIPaddConflictBinvar(scip, vars[i][j]) );
+<                   SCIP_CALL( SCIPaddConflictBinvar(scip, vars[j][i]) );
+<                   SCIP_CALL( SCIPanalyzeConflictCons(scip, cons, NULL) );
+< 		  *result = SCIP_CUTOFF;
+< 		  return SCIP_OKAY;
+< 	       }
+---
+>                SCIP_CALL( SCIPtightenVarUb(scip,vars[j][i],0,TRUE,&infeasible,&tightened) );
+>                if( infeasible )
+>                {
+>                   SCIPdebugMsg(scip, " -> node infeasible.\n");
+>                   *result = SCIP_CUTOFF;
+>                   return SCIP_OKAY;
+>                }
+> 	       /* SCIP_CALL( SCIPinferBinvarCons(scip, vars[j][i], FALSE, cons, i*n + j, &infeasible, &tightened) ); */
+> 	       /* if ( infeasible ) */
+> 	       /* { */
+> 	       /*    SCIPdebugMessage(" -> node infeasible.\n"); */
+>                /*    SCIP_CALL( SCIPinitConflictAnalysis(scip) ); */
+>                /*    SCIP_CALL( SCIPaddConflictBinvar(scip, vars[i][j]) ); */
+>                /*    SCIP_CALL( SCIPaddConflictBinvar(scip, vars[j][i]) ); */
+>                /*    SCIP_CALL( SCIPanalyzeConflictCons(scip, cons, NULL) ); */
+> 	       /*    *result = SCIP_CUTOFF; */
+> 	       /*    return SCIP_OKAY; */
+> 	       /* } */
+864,881c1080,1164
+< 	    /* if x[i][j] == 0 then x[j][i] = 1 */
+< 	    if ( SCIPvarGetUbLocal(vars[i][j]) < 0.5 )
+< 	    {
+< 	       SCIP_Bool infeasible, tightened;
+< 	       SCIP_CALL( SCIPinferBinvarCons(scip, vars[j][i], TRUE, cons, i*n + j, &infeasible, &tightened) );
+< 	       if ( infeasible )
+< 	       {
+< 		  SCIPdebugMsg(scip, " -> node infeasible.\n");
+<                   SCIP_CALL( SCIPinitConflictAnalysis(scip, SCIP_CONFTYPE_PROPAGATION, FALSE) );
+<                   SCIP_CALL( SCIPaddConflictBinvar(scip, vars[i][j]) );
+<                   SCIP_CALL( SCIPaddConflictBinvar(scip, vars[j][i]) );
+<                   SCIP_CALL( SCIPanalyzeConflictCons(scip, cons, NULL) );
+< 		  *result = SCIP_CUTOFF;
+< 		  return SCIP_OKAY;
+< 	       }
+< 	       if ( tightened )
+< 		  ++nGen;
+< 	    }
+---
+> 	    /* if i<-j == 1 then i<--j = 1 */
+>             arrow_var = get_arrow(psd,i,j);
+> 	    if ( arrow_var != NULL && SCIPvarGetLbLocal(arrow_var) > 0.5 )
+>             {
+>                SCIP_Bool infeasible, tightened;
+>                SCIP_CALL( SCIPtightenVarLb(scip,vars[i][j],1,TRUE,&infeasible,&tightened) );
+>                if( infeasible )
+>                {
+>                   SCIPdebugMsg(scip, " -> node infeasible.\n");
+>                   *result = SCIP_CUTOFF;
+>                   return SCIP_OKAY;
+>                }
+>                if( tightened )
+>                {
+>                   SCIPdebugMsg(scip, "Setting %s to 1\n", SCIPvarGetName(vars[i][j]));
+>                   ++nGen;
+>                }
+>             }
+> 
+> 
+>             /* if i<--j == 0 then i<-j = 0 */
+> 	    if ( arrow_var != NULL && SCIPvarGetUbLocal(vars[i][j]) < 0.5 )
+>             {
+>                SCIP_Bool infeasible, tightened;
+>                SCIP_CALL( SCIPtightenVarUb(scip,arrow_var,0,TRUE,&infeasible,&tightened) );
+>                if( infeasible )
+>                {
+>                   SCIPdebugMsg(scip, " -> node infeasible.\n");
+>                   *result = SCIP_CUTOFF;
+>                   return SCIP_OKAY;
+>                }
+>                if( tightened )
+>                {
+>                   SCIPdebugMsg(scip, "Setting %s to 0\n", SCIPvarGetName(arrow_var));
+>                   ++nGen;
+>                }
+>             }
+> 
+>             /* if minimal ...
+>                if parent set for i has been chosen and j is not an ancestor of any of these parents
+>                then not an ancestor of i either 
+>             */
+>             if( minimal )
+>             {
+>                for( k = 0; k < psd->nParentSets[i]; k++ )
+>                {
+>                   if ( SCIPvarGetLbLocal(psd->PaVars[i][k]) > 0.5 )
+>                   {
+>                      SCIP_Bool allnonancestors = TRUE;
+>                      int l;
+>                      int pa;
+>                      
+>                      for( l = 0; l < psd->nParents[i][k]; l++ )
+>                      {
+>                         pa = psd->ParentSets[i][k][l];
+>                         if( pa == j || SCIPvarGetUbLocal(vars[psd->ParentSets[i][k][l]][j]) > 0.5 )
+>                         {
+>                            allnonancestors = FALSE;
+>                            break;
+>                         }
+>                      }
+>                      
+>                      if( allnonancestors )
+>                      {
+>                         SCIP_Bool infeasible, tightened;
+>                         SCIP_CALL( SCIPtightenVarUb(scip,vars[i][j],0,TRUE,&infeasible,&tightened) );
+>                         if( infeasible )
+>                         {
+>                            SCIPdebugMsg(scip, " -> node infeasible.\n");
+>                            *result = SCIP_CUTOFF;
+>                            return SCIP_OKAY;
+>                         }
+>                         if( tightened )
+>                         {
+>                            SCIPdebugMsg(scip, "Setting %s to 0\n", SCIPvarGetName(vars[i][j]));
+>                            ++nGen;
+>                         }
+>                      }
+>                   }
+>                   else if( SCIPvarGetUbLocal(psd->PaVars[i][k]) < 0.5 )
+>                      /* if this one not set (either way) then no parent
+>                         set is set to 1 */
+>                      break;
+>                }
+>             }
+882a1166,1168
+>             if( !oneIJ )
+>                continue;
+>             
+888,889c1174,1176
+< 	       /* if x[i][j] == 1 and x[j][k] == 1 then x[k][i] = 0 */
+< 	       if ( SCIPvarGetLbLocal(vars[i][j]) > 0.5 && SCIPvarGetLbLocal(vars[j][k]) > 0.5 )
+---
+> 	       /* if x[i][j] == 1 and x[j][k] == 1 then x[i][k] = 1 */
+>                /* to get to here have to have oneIJ== TRUE, so don't test again */
+> 	       if ( SCIPvarGetLbLocal(vars[j][k]) > 0.5 )
+892,903c1179,1198
+< 		  SCIP_CALL( SCIPinferBinvarCons(scip, vars[k][i], FALSE, cons, n*n + i*n*n + j*n + k, &infeasible, &tightened) );
+< 		  if ( infeasible )
+< 		  {
+< 		     SCIPdebugMsg(scip, " -> node infeasible.\n");
+<                      SCIP_CALL( SCIPinitConflictAnalysis(scip, SCIP_CONFTYPE_PROPAGATION, FALSE) );
+<                      SCIP_CALL( SCIPaddConflictBinvar(scip, vars[i][j]) );
+<                      SCIP_CALL( SCIPaddConflictBinvar(scip, vars[j][k]) );
+<                      SCIP_CALL( SCIPaddConflictBinvar(scip, vars[k][i]) );
+<                      SCIP_CALL( SCIPanalyzeConflictCons(scip, cons, NULL) );
+< 		     *result = SCIP_CUTOFF;
+< 		     return SCIP_OKAY;
+< 		  }
+---
+>                   SCIP_CALL( SCIPtightenVarLb(scip,vars[i][k],1,TRUE,&infeasible,&tightened) );
+>                   if( infeasible )
+>                   {
+>                      SCIPdebugMsg(scip, " -> node infeasible.\n");
+>                      *result = SCIP_CUTOFF;
+>                      return SCIP_OKAY;
+>                   }
+> 
+> 		  /* SCIP_CALL( SCIPinferBinvarCons(scip, vars[i][k], TRUE, cons, n*n + i*n*n + j*n + k, &infeasible, &tightened) ); */
+> 		  /* if ( infeasible ) */
+> 		  /* { */
+> 		  /*    SCIPdebugMessage(" -> node infeasible.\n"); */
+>                   /*    SCIP_CALL( SCIPinitConflictAnalysis(scip) ); */
+>                   /*    SCIP_CALL( SCIPaddConflictBinvar(scip, vars[i][j]) ); */
+>                   /*    SCIP_CALL( SCIPaddConflictBinvar(scip, vars[j][k]) ); */
+>                   /*    SCIP_CALL( SCIPaddConflictBinvar(scip, vars[i][k]) ); */
+>                   /*    SCIP_CALL( SCIPanalyzeConflictCons(scip, cons, NULL) ); */
+> 		  /*    *result = SCIP_CUTOFF; */
+> 		  /*    return SCIP_OKAY; */
+> 		  /* } */
+920a1216
+> #if 0
+922c1218
+< SCIP_DECL_CONSRESPROP(consRespropLOP)
+---
+> SCIP_DECL_CONSRESPROP(consRespropPartialOrdering)
+960,969d1255
+<       /* if the variable was fixed to 0 */
+<       if ( SCIPvarGetUbAtIndex(infervar, bdchgidx, FALSE) > 0.5 && SCIPvarGetUbAtIndex(infervar, bdchgidx, TRUE) < 0.5 )
+<       {
+< 	 SCIPdebugMsg(scip, " -> reason for x[%d][%d] == 0 was x[%d][%d] = 1.\n", index2, index1, index1, index2);
+< 	 /* the reason was that x[i][j] was fixed to 1 */
+< 	 SCIP_CALL( SCIPaddConflictLb(scip, vars[index1][index2], bdchgidx) );
+< 	 *result = SCIP_SUCCESS;
+< 	 return SCIP_OKAY;
+<       }
+< 
+995c1281
+<       assert( vars[index3][index1] == infervar );
+---
+>       assert( vars[index1][index3] == infervar );
+997,998c1283,1284
+<       /* the variable should have been fixed to 0 */
+<       assert( SCIPvarGetUbAtIndex(infervar, bdchgidx, FALSE) > 0.5 && SCIPvarGetUbAtIndex(infervar, bdchgidx, TRUE) < 0.5 );
+---
+>       /* the variable should have been fixed to 1 */
+>       assert( SCIPvarGetUbAtIndex(infervar, bdchgidx, FALSE) < 0.5 && SCIPvarGetUbAtIndex(infervar, bdchgidx, TRUE) > 0.5 );
+1001c1287
+<       SCIPdebugMsg(scip, " -> reason for x[%d][%d] == 0 was x[%d][%d] = x[%d][%d] = 1.\n", index3, index1, index1, index2, index2, index3);
+---
+>       SCIPdebugMsg(scip, " -> reason for x[%d][%d] == 1 was x[%d][%d] = x[%d][%d] = 1.\n", index1, index3, index1, index2, index2, index3);
+1008a1295,1297
+> #else
+> #define consRespropPartialOrdering NULL
+> #endif
+1012c1301
+< SCIP_DECL_CONSLOCK(consLockLOP)
+---
+> SCIP_DECL_CONSLOCK(consLockPartialOrdering)
+1015a1305
+>    int k;
+1019c1309,1311
+< 
+---
+>    ParentSetData* psd;
+>    SCIP_VAR* arrow_var;
+>    
+1030a1323
+>    assert( consdata->psd != NULL );
+1033c1326,1327
+< 
+---
+>    psd = consdata->psd;
+>    
+1040c1334
+< 	    /* the constaint may be violated in any way */
+---
+> 	    /* the constraint may be violated in any way */
+1041a1336,1340
+> 
+>             arrow_var = get_arrow(psd,i,j);
+>             if( arrow_var != NULL )
+>                /* the constraint may be violated in any way */
+>                SCIP_CALL( SCIPaddVarLocks(scip, arrow_var, nlockspos + nlocksneg, nlockspos + nlocksneg) );
+1043a1343,1345
+>       for( k = 0; k < psd->nParentSets[i]; k++ )
+>          /* the constraint may be violated in any way */
+>          SCIP_CALL( SCIPaddVarLocks(scip, psd->PaVars[i][k], nlockspos + nlocksneg, nlockspos + nlocksneg) );
+1051c1353
+< SCIP_DECL_CONSPRINT(consPrintLOP)
+---
+> SCIP_DECL_CONSPRINT(consPrintPartialOrdering)
+1070c1372
+<    SCIPinfoMessage(scip, file, "LOP[");
+---
+>    SCIPinfoMessage(scip, file, "partialordering[");
+1094c1396
+< SCIP_DECL_CONSCOPY(consCopyLOP)
+---
+> SCIP_DECL_CONSCOPY(consCopyPartialOrdering)
+1100a1403
+>    int k;
+1102a1406,1410
+>    SCIP_Bool minimal;
+>    ParentSetData* targetpsd;
+>    SCIP_VAR* arrow_var;
+>    SCIP_VAR* new_arrow_var;
+>    
+1118a1427,1435
+>    minimal = sourcedata->minimal;
+> 
+>    /* copy parent set data, but does not create new variables */
+>    SCIP_CALL( PS_copyParentSetData(sourcescip, sourcedata->psd, &targetpsd) );
+>    /* have to reinitiaise hashtable for edges and arrows since new variables
+>       will be inserted using put_arrow (see below) */
+>    SCIP_CALL( hashtablefreeArrow(sourcescip, targetpsd) );
+>    SCIP_CALL( hashtableCreateArrow(sourcescip, targetpsd) );
+>    
+1135a1453,1467
+> 
+>          arrow_var = get_arrow(sourcedata->psd,i,j);
+>          if( arrow_var != NULL )
+>          {
+>             SCIP_CALL( SCIPgetVarCopy(sourcescip, scip, arrow_var, &new_arrow_var, varmap, consmap, global, valid) );
+>             assert( !(*valid) || new_arrow_var != NULL );
+>             put_arrow(scip, targetpsd, i, j, new_arrow_var);
+>          }
+>       }
+> 
+>       for( k = 0; k < sourcedata->psd->nParentSets[i]; k++ )
+>       {
+>          SCIP_CALL( SCIPgetVarCopy(sourcescip, scip, sourcedata->psd->PaVars[i][k], &(targetpsd->PaVars[i][k]),
+>                varmap, consmap, global, valid) );
+>          assert( !(*valid) || targetpsd->PaVars[i][k] != NULL );
+1136a1469
+> 
+1145c1478
+<       SCIP_CALL( SCIPcreateConsLOP(scip, cons, name, n, vars,
+---
+>       SCIP_CALL( SCIPcreateConsPartialOrdering(scip, cons, name, n, vars, targetpsd, minimal,
+1149,1150c1482
+<    /* free memory in reverse order */
+<    for (i = n-1; i >= 0; --i)
+---
+>    for (i = 0; i < n; ++i)
+1157,1158c1489,1490
+< /** creates the handler for linear ordering constraints and includes it in SCIP */
+< SCIP_RETCODE SCIPincludeConshdlrLOP(
+---
+> /** creates the handler for partial ordering constraints and includes it in SCIP */
+> SCIP_RETCODE SCIPincludeConshdlrPartialOrdering(
+1168,1176c1500,1508
+<          consEnfolpLOP, consEnfopsLOP, consCheckLOP, consLockLOP, NULL) );
+<    assert( conshdlr != NULL );
+< 
+<    SCIP_CALL( SCIPsetConshdlrDelete(scip, conshdlr, consDeleteLOP) );
+<    SCIP_CALL( SCIPsetConshdlrExit(scip, conshdlr, consExitLOP) );
+<    SCIP_CALL( SCIPsetConshdlrCopy(scip, conshdlr, conshdlrCopyLOP, consCopyLOP) );
+<    SCIP_CALL( SCIPsetConshdlrTrans(scip, conshdlr, consTransLOP) );
+<    SCIP_CALL( SCIPsetConshdlrInitlp(scip, conshdlr, consInitlpLOP) );
+<    SCIP_CALL( SCIPsetConshdlrSepa(scip, conshdlr, consSepalpLOP, consSepasolLOP,
+---
+>          consEnfolpPartialOrdering, consEnfopsPartialOrdering, consCheckPartialOrdering, consLockPartialOrdering,
+>          NULL) );
+>    assert(conshdlr != NULL);
+> 
+>    SCIP_CALL( SCIPsetConshdlrDelete(scip, conshdlr, consDeletePartialOrdering) );
+>    SCIP_CALL( SCIPsetConshdlrCopy(scip, conshdlr, conshdlrCopyPartialOrdering, consCopyPartialOrdering) );
+>    SCIP_CALL( SCIPsetConshdlrTrans(scip, conshdlr, consTransPartialOrdering) );
+>    SCIP_CALL( SCIPsetConshdlrInitlp(scip, conshdlr, consInitlpPartialOrdering) );
+>    SCIP_CALL( SCIPsetConshdlrSepa(scip, conshdlr, consSepalpPartialOrdering, consSepasolPartialOrdering,
+1178c1510
+<    SCIP_CALL( SCIPsetConshdlrProp(scip, conshdlr, consPropLOP, CONSHDLR_PROPFREQ,
+---
+>    SCIP_CALL( SCIPsetConshdlrProp(scip, conshdlr, consPropPartialOrdering, CONSHDLR_PROPFREQ,
+1180,1181c1512,1513
+<    SCIP_CALL( SCIPsetConshdlrResprop(scip, conshdlr, consRespropLOP) );
+<    SCIP_CALL( SCIPsetConshdlrPrint(scip, conshdlr, consPrintLOP) );
+---
+>    /* SCIP_CALL( SCIPsetConshdlrResprop(scip, conshdlr, consRespropPartialOrdering) ); */
+>    SCIP_CALL( SCIPsetConshdlrPrint(scip, conshdlr, consPrintPartialOrdering) );
+1186,1187c1518,1519
+< /** creates and captures a linear ordering constraint */
+< SCIP_RETCODE SCIPcreateConsLOP(
+---
+> /** creates and captures a partial ordering constraint */
+> SCIP_RETCODE SCIPcreateConsPartialOrdering(
+1192a1525,1526
+>    ParentSetData*        psd,                /**< contains arrow and parent set variables */
+>    SCIP_Bool             minimal,            /**< whether the partial order must minimal while being consistent with arrows */
+1211c1545,1548
+<    /* find the linear ordering constraint handler */
+---
+>    assert(vars != NULL);
+>    assert(psd != NULL);
+>    
+>    /* find the partial ordering constraint handler */
+1215c1552
+<       SCIPerrorMessage("linear ordering constraint handler not found\n");
+---
+>       SCIPerrorMessage("partial ordering constraint handler not found\n");
+1222a1560
+>    consdata->minimal = minimal;
+1236a1575,1577
+>    SCIP_CALL( PS_copyParentSetData(scip, psd, &(consdata->psd)) );
+>    assert(consdata->psd != NULL);
+>    
+1239a1581,1601
+> 
+>    return SCIP_OKAY;
+> }
+> 
+> /** creates and captures a partial ordering constraint with all its constraint flags set to their
+>  *  default values
+>  *
+>  *  @note the constraint gets captured, hence at one point you have to release it using the method SCIPreleaseCons()
+>  */
+> SCIP_RETCODE SCIPcreateConsBasicPartialOrdering(
+>    SCIP*                 scip,               /**< SCIP data structure */
+>    SCIP_CONS**           cons,               /**< pointer to hold the created constraint */
+>    const char*           name,               /**< name of constraint */
+>    int                   n,                  /**< number of elements */
+>    SCIP_VAR***           vars,               /**< n x n matrix of binary variables */
+>    ParentSetData*        psd,                /**< contains arrow and parent set variables */
+>    SCIP_Bool             minimal             /**< whether the partial order must minimal while being consistent with arrows */
+>    )
+> {
+>    SCIP_CALL( SCIPcreateConsPartialOrdering(scip, cons, name, n, vars, psd, minimal,
+>          TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE) );

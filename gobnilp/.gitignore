@@ -1,0 +1,36 @@
+# Output and intermediate latex files for the manual
+# (but not the input file)
+manual.*
+manual_tmp.aux
+!manual.ltx
+!manual.bib
+
+# Doxygen documantation directory
+docs/
+
+#DS_Store files
+*.DS_Store
+
+#Ignore test data
+tests/data/
+
+# Output and immediate directories from compiling the code
+obj/
+bin/
+
+# Automated backup files
+*~
+*.bak
+# Temporary files
+/tmp.*
+/tmp*.*
+
+# cons_linearordering
+src/cons_linearordering.h
+src/cons_linearordering.c
+
+# Link to SCIP
+scip
+
+# Compiled standalone scorer
+scoring
