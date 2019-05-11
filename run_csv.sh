@@ -14,7 +14,7 @@ mkdir -p ./results/settings
 sed -i "54s/.*/#define EXP_BF $2/" ./gobnilp/src/scoring.c
 
 # Check the make command to add flags if it fails
-make LPS=cpx -C ./gobnilp || exit 1
+make -C ./gobnilp || exit 1
 
 num_lines=$(wc -l < ./CSV/$1.csv)
 num_data=$(($num_lines-2))
