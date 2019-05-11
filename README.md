@@ -15,8 +15,13 @@ To generate Bayesian networks from data, type
 
 ./run_csv <probname> <bf>
 ```
-where <probname> is the name of the csv file in ./CSV
-and <bf> is the desired Bayes factor,
-e.g., ./run_csv wine 3 for ./CSV/wine.csv and a Bayes factor of 3.
+where probname is the name of the csv file in ./CSV and bf is the desired Bayes factor.
+For example, type
+```
+#!bash
+
+./run_csv wine 3
+```
+for ./CSV/wine.csv and a Bayes factor of 3.
 
 Please send questions and comments to alister.liao@uwaterloo.ca
