@@ -24,4 +24,19 @@ For example, type
 ```
 for ./CSV/wine.csv and a Bayes factor of 3.
 
+To collect Bayesian networks from pruned scoring files, type
+```
+#!bash
+
+./run_score <scorename> <bf>
+```
+where where <scorename> is the name of the scoring file in ./scores and bf is the desired Bayes factor.
+For example, type
+```
+#!bash
+
+./run_score wine.3 3
+```
+for ./scores/wine.3 and a Bayes factor of 3.
+
 Please send questions and comments to alister.liao@uwaterloo.ca
