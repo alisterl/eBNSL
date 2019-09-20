@@ -58,94 +58,94 @@ To use the package you need to first compile GOBNILP by following the steps prov
 
 3. Compile GOBNILP
 
-  The included GOBNILP is modified from the development version [[GitHash:db37374](https://bitbucket.org/jamescussens/gobnilp/src/db373747e76955f35437170f9641c9130bf50e9a/)]. Type the following command in `./gobnilp`.
+    The included GOBNILP is modified from the development version [[GitHash:db37374](https://bitbucket.org/jamescussens/gobnilp/src/db373747e76955f35437170f9641c9130bf50e9a/)]. Type the following command in `./gobnilp`.
 
-  1. Link SCIP
+    1. Link SCIP
 
-    ```
-    ./configure.sh <scipoptsuite-path>/scip
-    ```
+      ```
+      ./configure.sh <scipoptsuite-path>/scip
+      ```
 
-  2. Compile
-      * with CPLEX
+    2. Compile
+        * with CPLEX
 
-        ```
-        make LPS=cpx ZIMPL=false
-        ```
+          ```
+          make LPS=cpx ZIMPL=false
+          ```
 
-      * without CPLEX
+        * without CPLEX
 
-        ```
-        make ZIMPL=false
-        ```
+          ```
+          make ZIMPL=false
+          ```
 
-      You also need to add additional flags used in Step 2.
+        You also need to add additional flags used in Step 2.
 
 4. Check the installation
 
-  You can use a small dataset to check whether GOBNILP has been properly installed. Type the following command in the package directory. It asks GOBNILP to find the optimal network using the pruned scoring file `wine.BIC.3`.
+    You can use a small dataset to check whether GOBNILP has been properly installed. Type the following command in the package directory. It asks GOBNILP to find the optimal network using the pruned scoring file `wine.BIC.3`.
 
-  ```
-  ./gobnilp/bin/gobnilp ./scores/wine.BIC.3
-  ```
+    ```
+    ./gobnilp/bin/gobnilp ./scores/wine.BIC.3
+    ```
 
-  <details>
-    <summary>Sample output</summary>  
-  <p>
+    <details>
+      <summary>Sample output</summary>  
+    <p>
 
-  ```
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+    ```
+    GOBNILP version development [GitHash: 9f8daa2 ]
+    Solving the BN structure learning problem using SCIP.
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+    SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+    Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-  WARNING: Parameter file <gobnilp.set> not found - using default settings.
-  WARNING: Input file format not recognised - assuming it is Jaakkola.
-  File name:		./scores/wine.BIC.3
-  Problem name:		wine
-  Number of variables: 14
-  Number of candidate parent sets: 592
+    WARNING: Parameter file <gobnilp.set> not found - using default settings.
+    WARNING: Input file format not recognised - assuming it is Jaakkola.
+    File name:		./scores/wine.BIC.3
+    Problem name:		wine
+    Number of variables: 14
+    Number of candidate parent sets: 592
 
-  presolving (4 rounds: 4 fast, 3 medium, 2 exhaustive):
-   99 deleted vars, 36 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 81 changed sides, 81 changed coefficients
-   0 implications, 4554 cliques
-  presolved problem has 738 variables (738 bin, 0 int, 0 impl, 0 cont) and 450 constraints
+    presolving (4 rounds: 4 fast, 3 medium, 2 exhaustive):
+     99 deleted vars, 36 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 81 changed sides, 81 changed coefficients
+     0 implications, 4554 cliques
+    presolved problem has 738 variables (738 bin, 0 int, 0 impl, 0 cont) and 450 constraints
 
-  time | Best Network Found So Far |   Best Network Possible   | mem |  gap   |objleav|infleav
-   0.2s|       -1.286816e+03       |        0.000000e+00       |9754k|    Inf |     0 |     0
-   0.2s|       -1.276888e+03       |       -1.174130e+03       |9759k|   8.75%|     0 |     0
-   0.2s|       -1.262882e+03       |       -1.194630e+03       |9767k|   5.71%|     0 |     0
-   0.2s|       -1.262502e+03       |       -1.198862e+03       |9775k|   5.31%|     0 |     0
-   0.2s|       -1.259041e+03       |       -1.214714e+03       |9820k|   3.65%|     0 |     0
-   0.7s|       -1.258446e+03       |       -1.256731e+03       |  26M|   0.14%|     0 |     0
-   1.4s|       -1.258446e+03       |       -1.258446e+03       |  50M|   0.00%|     0 |     0
+    time | Best Network Found So Far |   Best Network Possible   | mem |  gap   |objleav|infleav
+     0.2s|       -1.286816e+03       |        0.000000e+00       |9754k|    Inf |     0 |     0
+     0.2s|       -1.276888e+03       |       -1.174130e+03       |9759k|   8.75%|     0 |     0
+     0.2s|       -1.262882e+03       |       -1.194630e+03       |9767k|   5.71%|     0 |     0
+     0.2s|       -1.262502e+03       |       -1.198862e+03       |9775k|   5.31%|     0 |     0
+     0.2s|       -1.259041e+03       |       -1.214714e+03       |9820k|   3.65%|     0 |     0
+     0.7s|       -1.258446e+03       |       -1.256731e+03       |  26M|   0.14%|     0 |     0
+     1.4s|       -1.258446e+03       |       -1.258446e+03       |  50M|   0.00%|     0 |     0
 
-  SCIP Status        : problem is solved [optimal solution found]
-  Solving Time (sec) : 1.43
-  Solving Nodes      : 1
-  Primal Bound       : -1.25844590861000e+03 (13 solutions)
-  Dual Bound         : -1.25844590861000e+03
-  Gap                : 0.00 %
-  0<-7,12, -121.535985
-  1<-0, -72.056337
-  2<-0, -90.136687
-  3<-0, -123.583712
-  4<-0,3, -94.653216
-  5<-0, -116.096894
-  6<-7, -54.213399
-  7<-12, -71.276573
-  8<-4,12, -93.494926
-  9<-2,7, -95.559163
-  10<-0, -62.365545
-  11<-0, -94.357428
-  12<- -123.759669
-  13<-0, -45.356374
-  BN score is -1258.445909
-  ```
+    SCIP Status        : problem is solved [optimal solution found]
+    Solving Time (sec) : 1.43
+    Solving Nodes      : 1
+    Primal Bound       : -1.25844590861000e+03 (13 solutions)
+    Dual Bound         : -1.25844590861000e+03
+    Gap                : 0.00 %
+    0<-7,12, -121.535985
+    1<-0, -72.056337
+    2<-0, -90.136687
+    3<-0, -123.583712
+    4<-0,3, -94.653216
+    5<-0, -116.096894
+    6<-7, -54.213399
+    7<-12, -71.276573
+    8<-4,12, -93.494926
+    9<-2,7, -95.559163
+    10<-0, -62.365545
+    11<-0, -94.357428
+    12<- -123.759669
+    13<-0, -45.356374
+    BN score is -1258.445909
+    ```
 
-  </p>
-  </details>
+    </p>
+    </details>
 
 ## Running the Experiments
 
