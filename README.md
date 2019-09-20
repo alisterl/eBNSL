@@ -35,29 +35,31 @@ To use the package you need to first compile GOBNILP by following the steps prov
 1. (Optional) Install CPLEX
 2. Install SCIP
 
-  Type the following command in the `scipoptsuite-6.0.1` directory.
-  * with CPLEX
+    Type the following command in the `scipoptsuite-6.0.1` directory.
+
+    * with CPLEX
+
+      ```
+      make LPS=cpx ZIMPL=false
+      ```
+
+      Please use the ***absolute path*** for CPLEX during the installation.
+    * without CPLEX
+
+      ```
+      make ZIMPL=false
+      ```
+
+    If you encounter any problem, you can try adding some or all of the following flags.
 
     ```
-    make LPS=cpx ZIMPL=false
+    ZLIB=false GMP=false READLINE=false LPSOPT=opt-gccold OPT=opt-gccold
     ```
-
-    Please use the ***absolute path*** for CPLEX during the installation.
-  * without CPLEX
-
-    ```
-    make ZIMPL=false
-    ```
-
-  If you encounter any problem, you can try adding some or all of the following flags.
-
-  ```
-  ZLIB=false GMP=false READLINE=false LPSOPT=opt-gccold OPT=opt-gccold
-  ```
 
 3. Compile GOBNILP
 
   The included GOBNILP is modified from the development version [[GitHash:db37374](https://bitbucket.org/jamescussens/gobnilp/src/db373747e76955f35437170f9641c9130bf50e9a/)]. Type the following command in `./gobnilp`.
+
   1. Link SCIP
 
     ```
@@ -65,18 +67,19 @@ To use the package you need to first compile GOBNILP by following the steps prov
     ```
 
   2. Compile
-    * with CPLEX
+      * with CPLEX
 
-      ```
-      make LPS=cpx ZIMPL=false
-      ```
+        ```
+        make LPS=cpx ZIMPL=false
+        ```
 
-    * without CPLEX
+      * without CPLEX
 
-      ```
-      make ZIMPL=false
-      ```
-    You also need to add additional flags used in Step 2.
+        ```
+        make ZIMPL=false
+        ```
+
+      You also need to add additional flags used in Step 2.
 
 4. Check the installation
 
