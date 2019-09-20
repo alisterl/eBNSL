@@ -62,9 +62,9 @@ To use the package you need to first compile GOBNILP by following the steps prov
 
     1. Link SCIP
 
-      ```
-      ./configure.sh <scipoptsuite-path>/scip
-      ```
+        ```
+        ./configure.sh <scipoptsuite-path>/scip
+        ```
 
     2. Compile
         * with CPLEX
