@@ -27,7 +27,10 @@
 
  /** @file
   * Describes the main functions for scoring a node within a Gaussian Network
-  * using the bge scoring metric.
+  * using the BGe scoring metric.
+  * Strictly speaking the "BGe score" is P(DAG|Data) [See e.g. https://arxiv.org/abs/1402.6863v2 ]
+  * and so depends on some prior P(DAG). Here we actually compute log P(Data|DAG) and call it "the
+  * BGe score" or "log BGe score".
   */
 
 #include <stdio.h>
@@ -38,7 +41,7 @@
 #include "bge_score.h"
 #include "bge_matrix.h"
 
-/** Computes The log of the bge score for a node either with or without parents
+/** Computes The log of the BGe score for a node either with or without parents
   * @param node The integer representation of the node in relation to the row/column in the dataset
   * @param family The family of the node being score where the value family[0] = node
   * @param no_parents The number of parents of the node
@@ -49,10 +52,12 @@
   * @param prior_matrix The prior matrix T
   * @param posterior_matrix The posterior matrix R
   * @param data - The continuous data that the network is being learned from
+  * @return The log BGe score for the family
  */
 double LogBgeScore(
    int node,
-   unsigned int * family,
+   unsigned int* family,
+   unsigned int* ordered_family,
    int no_parents,
    int alpha_mu,
    int alpha_omega,
@@ -60,7 +65,9 @@ double LogBgeScore(
    double* log_gamma_ratio_table,
    Bge_Matrix* prior_matrix,
    Bge_Matrix* posterior_matrix,
-   Bge_Matrix* data
+   Bge_Matrix* data,
+   SCORECACHE* scorecache,
+   SCIP* scip
 )
 {
    double score;
@@ -72,8 +79,8 @@ double LogBgeScore(
    }
    else
    {
-    score = LogBgeScoreWithParents(node, family, no_parents, alpha_mu, alpha_omega,
-            log_prefactor, log_gamma_ratio_table,  prior_matrix, posterior_matrix, data);
+      score = LogBgeScoreWithParents(node, family, ordered_family, no_parents, alpha_mu, alpha_omega,
+         log_prefactor, log_gamma_ratio_table,  prior_matrix, posterior_matrix, data, scorecache, scip);
    }
 
   return score;
@@ -168,7 +175,8 @@ double LogBgeScoreWithoutParents(
 
 /** Computes The log of the bge score for a node with parents
   * @param node The integer representation of the node in relation to the row/column in the dataset
-  * @param family The family of the node being score where the value family[0] = node
+  * @param family The family of the node being scored where the value family[0] = node
+  * @param ordered_family The family of the node being scored where family variables are ordered
   * @param no_parents The number of parents of the node
   * @param alpha_mu A hyper parameter used to in computing the posterior_matrix
   * @param alpha_omega A hyper parameter used to in computing the posterior_matrix
@@ -180,7 +188,8 @@ double LogBgeScoreWithoutParents(
  */
 double LogBgeScoreWithParents(
    int node,
-   unsigned int * family,
+   unsigned int* family,
+   unsigned int* ordered_family,
    int no_parents,
    int alpha_mu,
    int alpha_omega,
@@ -188,7 +197,9 @@ double LogBgeScoreWithParents(
    double * log_gamma_ratio_table,
    Bge_Matrix* prior_matrix,
    Bge_Matrix* posterior_matrix,
-   Bge_Matrix* data
+   Bge_Matrix* data,
+   SCORECACHE* scorecache,
+   SCIP* scip
 )
 {
   double score;
@@ -199,31 +210,77 @@ double LogBgeScoreWithParents(
    Bge_Matrix* parent_posterior;
    Bge_Matrix *sub_posterior;
 
+   int parents_rank;
+   int family_rank;
+   unsigned int parents_flag;
+   unsigned int family_flag;
+
+   double parents_llh;
+   double family_llh;
+   
    no_samples   = data->rows; /* N number of total samples */
    no_variables = data->cols; /* n number of total variables */
 
-   parent_posterior = BgeMatrixCreate(no_parents,no_parents);
-   sub_posterior    = BgeMatrixCreate(no_parents + 1, no_parents + 1);
+   parents_llh = get_score_count_rank(scorecache, family+1, no_parents, &parents_rank, &parents_flag);
+   family_llh = get_score_count_rank(scorecache, ordered_family, no_parents+1, &family_rank, &family_flag);
 
-   /* set the sub_posterior matrix and parent_posterior matrix */
-   BgeMatrixSetPosteriorSubMatrix(family, no_parents + 1, posterior_matrix, sub_posterior);
-   BgeMatrixSetPosteriorParentMatrix(sub_posterior, parent_posterior);
+   /* Computing ( log of ) equation (B.1) from Kuipers et al */
 
-   score  = log_prefactor; /* log_prefactor same for every score */
+   score  = log_prefactor; /* log_prefactor same for every score. Should be pre-added to gamma ratios! */
 
-   score += log_gamma_ratio_table[no_parents]; /* get the gamma ration corresponding to the size of the parent set */
+   score += log_gamma_ratio_table[no_parents]; /* get the gamma ratio corresponding to the size of the parent set */
 
+   /* simplified ratio of determinants of prior matrices. See (B.6) and (B.7) */
+   /* this too should be in the log_gamma_ratio_table */
    score += (0.5 * (alpha_omega - no_variables + (2 * no_parents) + 1)) *
             log((alpha_mu * (alpha_omega - no_variables - 1.0)) / (alpha_mu + 1.0));
 
-   score += ((0.5 * (no_samples + alpha_omega - no_variables + no_parents)))
-            * BgeMatrixLogDeterminant(parent_posterior);
+   /* if parent score not in cache need to create both matrices */
+   if( parents_flag == 0 )
+   {
+      parent_posterior = BgeMatrixCreate(no_parents,no_parents);          /* R_PP */
+      sub_posterior    = BgeMatrixCreate(no_parents + 1, no_parents + 1); /* R_QQ */
 
-   score -= ((0.5 * (no_samples + alpha_omega - no_variables + no_parents + 1)))
-            * BgeMatrixLogDeterminant(sub_posterior);
+      /* set the sub_posterior matrix and parent_posterior matrix */
+      BgeMatrixSetPosteriorSubMatrix(family, no_parents + 1, posterior_matrix, sub_posterior);
+      BgeMatrixSetPosteriorParentMatrix(sub_posterior, parent_posterior);
+   }
+   /* otherwise if family missing then just need that matrix */
+   else if( family_flag == 0 )
+   {
+      sub_posterior    = BgeMatrixCreate(no_parents + 1, no_parents + 1); /* R_QQ */
+      BgeMatrixSetPosteriorSubMatrix(family, no_parents + 1, posterior_matrix, sub_posterior);
+   }
+   
+   /* Term involving R_PP in numerator */
+   if( parents_flag == 0 )
+   {
+      parents_llh = ((0.5 * (no_samples + alpha_omega - no_variables + no_parents)))
+         * BgeMatrixLogDeterminant(parent_posterior);
+      if( parents_rank != -1)
+         SCIP_CALL( set_score_count_from_rank(scip, scorecache, parents_rank, parents_llh, 1) );
+   }
+   score += parents_llh;
+   
+   /* Term involving R_QQ in numerator */
+   if( family_flag == 0 )
+   {
+      family_llh = ((0.5 * (no_samples + alpha_omega - no_variables + no_parents + 1)))
+         * BgeMatrixLogDeterminant(sub_posterior);
+      if( family_rank != -1)
+         SCIP_CALL( set_score_count_from_rank(scip, scorecache, family_rank, family_llh, 1) );
+      
+   }
 
-   BgeMatrixDelete(&parent_posterior);
-   BgeMatrixDelete(&sub_posterior);
+   score -= family_llh;
+
+   if( parents_flag == 0 )
+   {
+      BgeMatrixDelete(&parent_posterior);
+      BgeMatrixDelete(&sub_posterior);
+   }
+   else if( family_flag == 0 )
+      BgeMatrixDelete(&sub_posterior);
 
    return score;
 }

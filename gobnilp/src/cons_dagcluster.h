@@ -36,10 +36,14 @@
 
 #include "scip/scip.h"
 #include "parent_set_data.h"
+#include "probdata_bn.h"
+
 
 extern SCIP_RETCODE DC_includeConshdlr(SCIP* scip);
 extern SCIP_RETCODE DC_createCons(SCIP* scip, SCIP_CONS** cons, const char* name, ParentSetData* psd,
                                   SCIP_Bool initial, SCIP_Bool separate, SCIP_Bool enforce, SCIP_Bool check, SCIP_Bool propagate,
                                   SCIP_Bool local, SCIP_Bool modifiable, SCIP_Bool dynamic, SCIP_Bool removable, SCIP_Bool stickingatnode);
 extern SCIP_RETCODE DC_tryToSplit(SCIP* scip);
+extern SCIP_RETCODE DC_getclustercuts(SCIP* scip, int* nclustercuts, CLUSTER_CUT*** clustercuts);
+extern SCIP_RETCODE DC_copyclustercut(SCIP* scip, CLUSTER_CUT** clustercut, CLUSTER_CUT* orig_cluster_cut);
 #endif

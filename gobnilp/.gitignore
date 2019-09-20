@@ -8,10 +8,10 @@ manual_tmp.aux
 # Doxygen documantation directory
 docs/
 
-#DS_Store files
+# DS_Store files
 *.DS_Store
 
-#Ignore test data
+# Ignore test data
 tests/data/
 
 # Output and immediate directories from compiling the code
@@ -34,3 +34,7 @@ scip
 
 # Compiled standalone scorer
 scoring
+
+# Python stuff
+*.pyc
+python/__pycache__/

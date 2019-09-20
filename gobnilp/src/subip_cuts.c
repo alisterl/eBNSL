@@ -591,7 +591,6 @@ static SCIP_RETCODE FindPairs(
    return SCIP_OKAY;
 }
 
-
 /** Given a cluster, finds family variables for that cluster and adds the cluster cut */
 static SCIP_RETCODE AddClusterCut(
    SCIP*           scip,                  /**< (Main) SCIP instance */
@@ -609,7 +608,10 @@ static SCIP_RETCODE AddClusterCut(
    int             matroidpaircutslimit,
    int             matroidpairmaxcuts,
    SCIP_Real       excess,
-   SCIP_Bool*      cutoff                 /**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) */
+   SCIP_Bool*      cutoff,                /**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) */
+   CLUSTER_CUT**   cluster_cut,           /**< cluster cut that was added */
+   SCIP_Bool       storecuts,
+   SCIP_Bool       knapsackonly
 )
 {
    SCIP_ROW* cut;
@@ -629,6 +631,9 @@ static SCIP_RETCODE AddClusterCut(
 
    ParentSetData*  outpsd;
    int* cluster;
+
+   int* elts;
+   int nelts;
    
    assert(psd != NULL);
    assert(psd->PaVars != NULL);
@@ -647,6 +652,12 @@ static SCIP_RETCODE AddClusterCut(
    SCIP_CALL( SCIPallocBufferArray(scip, &included, maxnpas) );
    SCIP_CALL( SCIPallocBufferArray(scip, &excluded, maxnpas) );
 
+   if( storecuts )
+   {
+      nelts = 0;
+      SCIP_CALL( SCIPallocBufferArray(scip, &elts, cluster_size) );
+   }
+   
    for( i = 0 ; i < psd->n ; ++i )
    {
       if( !incluster[i] )
@@ -683,14 +694,19 @@ static SCIP_RETCODE AddClusterCut(
       }
       
       /* Use convexity constraint to reduce number of variables in the cut */
-      if( n_excluded < psd->nParentSets[i]  / 2 )
+      if( !knapsackonly && n_excluded < psd->nParentSets[i]  / 2 )
       {
          SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_excluded, excluded, -1.0) );
+         if( storecuts )
+            elts[nelts++] = -i; 
          rhs--;
       }
       else
+      {
          SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_included, included, 1.0) );
-
+         if( storecuts )
+            elts[nelts++] = i;
+      }
    }
 
    SCIPfreeBufferArray(scip, &excluded);
@@ -705,6 +721,9 @@ static SCIP_RETCODE AddClusterCut(
                     SCIPgetRowMaxCoef(scip, cut) / SCIPgetRowMinCoef(scip, cut));
    SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cut, NULL) ));
 
+   if( storecuts )
+      SCIP_CALL( storeclustercut(scip, cluster_cut, NULL, cut, cluster_size, elts, 1) );
+   
    SCIP_CALL( SCIPaddRow(scip, cut, forcecuts, cutoff) );
    if( *cutoff )
    {
@@ -723,6 +742,7 @@ static SCIP_RETCODE AddClusterCut(
 
    if( matroidpaircuts && cluster_size < matroidpaircutslimit )
    {
+      /* matroid cuts currently never stored */
       SCIP_CALL( FindFamilyVarsinClusterCut(scip, psd, incluster, cluster_size, &cluster, &outpsd) );
       SCIP_CALL( FindPairs(scip, psd, outpsd, cluster, conshdlr, sol, matroidpairmaxcuts,
             addtopool, forcecuts, found_efficacious_ptr, excess, cutoff) );
@@ -747,186 +767,188 @@ static SCIP_RETCODE AddClusterCut(
       /* SCIP_CALL( AddMatroidPairCuts(scip, psd, conshdlr, sol, incluster, cluster_size,  */
       /*       found_efficacious_ptr, cutoff) ); */
    }
+
+   if( storecuts )
+      SCIPfreeBufferArray(scip, &elts);
    
    return SCIP_OKAY;
 }
 
-#if 0
-/** Given the family variables for a given cluster, just adds the cluster cut */
-static SCIP_RETCODE JustAddClusterCut(
-   SCIP*           scip,                  /**< (Main) SCIP instance */
-   SCIP_CONSHDLR*  conshdlr,              /**< the constraint handler responsible for adding these cuts (will be 'dagcluster') */
-   SCIP_SOL*       sol,                   /**< solution to be separated */
-   int             cluster_size,          /**< the size of the found cluster */
-   SCIP_Bool       addtopool,             /**< whether to add the cut to the global cut pool */
-   SCIP_Bool       forcecuts,             /**< whether to force cuts to be added */
-   SCIP_Bool*      found_efficacious_ptr, /**< for recording whether the cutting plane is efficacious */
-   SCIP_Bool*      cutoff,                 /**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) */
-   const int* n_included,     /**< n_included[c] is the number of family variables with cth cluster member included in the cut */
-   const int* n_excluded,     /**< n_excluded[c] is the number of family variables with cth cluster member excluded from the cut */
-   SCIP_VAR*** includedvars,  /**< includedvars[c][j] is the index of the jth family variable for cth cluster member included in the cut */
-   SCIP_VAR*** excludedvars   /**< excludedvars[c][j] is the index of the jth family variable for cth cluster member excluded from the cut */
-)
-{
+/* /\** Given the family variables for a given cluster, just adds the cluster cut *\/ */
+/* static SCIP_RETCODE JustAddClusterCut( */
+/*    SCIP*           scip,                  /\**< (Main) SCIP instance *\/ */
+/*    SCIP_CONSHDLR*  conshdlr,              /\**< the constraint handler responsible for adding these cuts (will be 'dagcluster') *\/ */
+/*    SCIP_SOL*       sol,                   /\**< solution to be separated *\/ */
+/*    int             cluster_size,          /\**< the size of the found cluster *\/ */
+/*    SCIP_Bool       addtopool,             /\**< whether to add the cut to the global cut pool *\/ */
+/*    SCIP_Bool       forcecuts,             /\**< whether to force cuts to be added *\/ */
+/*    SCIP_Bool*      found_efficacious_ptr, /\**< for recording whether the cutting plane is efficacious *\/ */
+/*    SCIP_Bool*      cutoff,                 /\**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) *\/ */
+/*    const int* n_included,     /\**< n_included[c] is the number of family variables with cth cluster member included in the cut *\/ */
+/*    const int* n_excluded,     /\**< n_excluded[c] is the number of family variables with cth cluster member excluded from the cut *\/ */
+/*    SCIP_VAR*** includedvars,  /\**< includedvars[c][j] is the index of the jth family variable for cth cluster member included in the cut *\/ */
+/*    SCIP_VAR*** excludedvars   /\**< excludedvars[c][j] is the index of the jth family variable for cth cluster member excluded from the cut *\/ */
+/* ) */
+/* { */
 
-   int c;
-   SCIP_ROW* cut;
-   int rhs = cluster_size - 1;
+/*    int c; */
+/*    SCIP_ROW* cut; */
+/*    int rhs = cluster_size - 1; */
 
-   assert( scip != NULL );
-   assert( conshdlr != NULL );
-   assert( n_included != NULL );
-   assert( n_excluded != NULL );
-   assert( includedvars != NULL );
-   assert( excludedvars != NULL );
+/*    assert( scip != NULL ); */
+/*    assert( conshdlr != NULL ); */
+/*    assert( n_included != NULL ); */
+/*    assert( n_excluded != NULL ); */
+/*    assert( includedvars != NULL ); */
+/*    assert( excludedvars != NULL ); */
    
-   SCIP_CALL( SCIPcreateEmptyRowCons(scip, &cut, conshdlr, "clustercut", -SCIPinfinity(scip), rhs, FALSE, FALSE, TRUE) );
+/*    SCIP_CALL( SCIPcreateEmptyRowCons(scip, &cut, conshdlr, "clustercut", -SCIPinfinity(scip), rhs, FALSE, FALSE, TRUE) ); */
 
-   for( c = 0 ; c < cluster_size ; ++c )
-   {
-      if( n_excluded[c] < n_included[c] )
-      {
-         SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_excluded[c], excludedvars[c], -1.0) );
-         rhs--;
-      }
-      else
-         SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_included[c], includedvars[c], 1.0) );
-   }
-   SCIP_CALL( SCIPchgRowRhs(scip, cut, rhs) );
-   assert(SCIPisIntegral(scip, rhs));
-   SCIPdebugMessage(" -> Cluster-cut <clustercut>: act=%f, rhs=%f, norm=%f, eff=%f, min=%f, max=%f (range=%f)\n",
-                    SCIPgetRowLPActivity(scip, cut), SCIProwGetRhs(cut), SCIProwGetNorm(cut),
-                    SCIPgetCutEfficacy(scip, NULL, cut),
-                    SCIPgetRowMinCoef(scip, cut), SCIPgetRowMaxCoef(scip, cut),
-                    SCIPgetRowMaxCoef(scip, cut) / SCIPgetRowMinCoef(scip, cut));
-   SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cut, NULL) ));
+/*    for( c = 0 ; c < cluster_size ; ++c ) */
+/*    { */
+/*       if( n_excluded[c] < n_included[c] ) */
+/*       { */
+/*          SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_excluded[c], excludedvars[c], -1.0) ); */
+/*          rhs--; */
+/*       } */
+/*       else */
+/*          SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_included[c], includedvars[c], 1.0) ); */
+/*    } */
+/*    SCIP_CALL( SCIPchgRowRhs(scip, cut, rhs) ); */
+/*    assert(SCIPisIntegral(scip, rhs)); */
+/*    SCIPdebugMessage(" -> Cluster-cut <clustercut>: act=%f, rhs=%f, norm=%f, eff=%f, min=%f, max=%f (range=%f)\n", */
+/*                     SCIPgetRowLPActivity(scip, cut), SCIProwGetRhs(cut), SCIProwGetNorm(cut), */
+/*                     SCIPgetCutEfficacy(scip, NULL, cut), */
+/*                     SCIPgetRowMinCoef(scip, cut), SCIPgetRowMaxCoef(scip, cut), */
+/*                     SCIPgetRowMaxCoef(scip, cut) / SCIPgetRowMinCoef(scip, cut)); */
+/*    SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cut, NULL) )); */
 
-   SCIP_CALL( SCIPaddRow(scip, cut, forcecuts, cutoff) );
-   if( *cutoff )
-   {
-      SCIPdebugMessage("Cluster cut led to cutoff\n");
-      SCIP_CALL( SCIPreleaseRow(scip, &cut) );
-      return SCIP_OKAY;
-   }
+/*    SCIP_CALL( SCIPaddRow(scip, cut, forcecuts, cutoff) ); */
+/*    if( *cutoff ) */
+/*    { */
+/*       SCIPdebugMessage("Cluster cut led to cutoff\n"); */
+/*       SCIP_CALL( SCIPreleaseRow(scip, &cut) ); */
+/*       return SCIP_OKAY; */
+/*    } */
 
-   if( addtopool )
-      SCIP_CALL( SCIPaddPoolCut(scip, cut) );
+/*    if( addtopool ) */
+/*       SCIP_CALL( SCIPaddPoolCut(scip, cut) ); */
 
-   if( SCIPisCutEfficacious(scip, sol, cut) )
-      *found_efficacious_ptr = TRUE;
+/*    if( SCIPisCutEfficacious(scip, sol, cut) ) */
+/*       *found_efficacious_ptr = TRUE; */
 
-   SCIP_CALL( SCIPreleaseRow(scip, &cut) );
+/*    SCIP_CALL( SCIPreleaseRow(scip, &cut) ); */
 
-   return SCIP_OKAY;
-}
+/*    return SCIP_OKAY; */
+/* } */
 
-/** Adds a found cluster cut ( 1-cluster, not a CI cut )*/
-static SCIP_RETCODE AddBasicClusterCut(
-   SCIP*           scip,                  /**< (Main) SCIP instance */
-   const ParentSetData*  psd,             /**< family variable information */
-   SCIP_CONSHDLR*  conshdlr,              /**< the constraint handler responsible for adding these cuts (will be 'dagcluster') */
-   SCIP_SOL*       sol,                   /**< solution to be separated */
-   SCIP_Bool*      incluster,             /**< the cluster itself: incluster[i] = TRUE iff i is in the cluster */
-   int             cluster_size,          /**< the size of the found cluster */
-   SCIP_Bool       addtopool,             /**< whether to add the cut to the global cut pool */
-   SCIP_Bool       forcecuts,             /**< whether to force cuts to be added */
-   SCIP_Bool*      found_efficacious_ptr, /**< for recording whether the cutting plane is efficacious */
-   SCIP_Bool*      cutoff                 /**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) */
-)
-{
-   SCIP_ROW* cut;
-   int rhs = cluster_size - 1;
-   int i;
-   int k;
-   int l;
-   int n_included;
-   int n_excluded;
-   SCIP_VAR** included;
-   SCIP_VAR** excluded;
-   SCIP_Bool include_in_cut;
-   int maxnpas;
+/* /\** Adds a found cluster cut ( 1-cluster, not a CI cut )*\/ */
+/* static SCIP_RETCODE AddBasicClusterCut( */
+/*    SCIP*           scip,                  /\**< (Main) SCIP instance *\/ */
+/*    const ParentSetData*  psd,             /\**< family variable information *\/ */
+/*    SCIP_CONSHDLR*  conshdlr,              /\**< the constraint handler responsible for adding these cuts (will be 'dagcluster') *\/ */
+/*    SCIP_SOL*       sol,                   /\**< solution to be separated *\/ */
+/*    SCIP_Bool*      incluster,             /\**< the cluster itself: incluster[i] = TRUE iff i is in the cluster *\/ */
+/*    int             cluster_size,          /\**< the size of the found cluster *\/ */
+/*    SCIP_Bool       addtopool,             /\**< whether to add the cut to the global cut pool *\/ */
+/*    SCIP_Bool       forcecuts,             /\**< whether to force cuts to be added *\/ */
+/*    SCIP_Bool*      found_efficacious_ptr, /\**< for recording whether the cutting plane is efficacious *\/ */
+/*    SCIP_Bool*      cutoff                 /\**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) *\/ */
+/* ) */
+/* { */
+/*    SCIP_ROW* cut; */
+/*    int rhs = cluster_size - 1; */
+/*    int i; */
+/*    int k; */
+/*    int l; */
+/*    int n_included; */
+/*    int n_excluded; */
+/*    SCIP_VAR** included; */
+/*    SCIP_VAR** excluded; */
+/*    SCIP_Bool include_in_cut; */
+/*    int maxnpas; */
    
-   assert(psd != NULL);
-   assert(psd->PaVars != NULL);
+/*    assert(psd != NULL); */
+/*    assert(psd->PaVars != NULL); */
 
-   SCIP_CALL( SCIPcreateEmptyRowCons(scip, &cut, conshdlr, "clustercut", -SCIPinfinity(scip), rhs, FALSE, FALSE, TRUE) );
+/*    SCIP_CALL( SCIPcreateEmptyRowCons(scip, &cut, conshdlr, "clustercut", -SCIPinfinity(scip), rhs, FALSE, FALSE, TRUE) ); */
 
-   maxnpas = 0;
-   for( i = 0 ; i < psd->n ; ++i )
-      if( incluster[i] )
-         maxnpas = max(maxnpas,psd->nParentSets[i]);
+/*    maxnpas = 0; */
+/*    for( i = 0 ; i < psd->n ; ++i ) */
+/*       if( incluster[i] ) */
+/*          maxnpas = max(maxnpas,psd->nParentSets[i]); */
 
-   SCIP_CALL( SCIPallocBufferArray(scip, &included, maxnpas) );
-   SCIP_CALL( SCIPallocBufferArray(scip, &excluded, maxnpas) );
+/*    SCIP_CALL( SCIPallocBufferArray(scip, &included, maxnpas) ); */
+/*    SCIP_CALL( SCIPallocBufferArray(scip, &excluded, maxnpas) ); */
 
-   for( i = 0 ; i < psd->n ; ++i )
-   {
-      if( !incluster[i] )
-         continue;
+/*    for( i = 0 ; i < psd->n ; ++i ) */
+/*    { */
+/*       if( !incluster[i] ) */
+/*          continue; */
 
-      n_included = 0;
-      n_excluded = 0;
+/*       n_included = 0; */
+/*       n_excluded = 0; */
 
-      /* include all parents sets with at least one parent in the cluster */
-      for( k = 0;  k < psd->nParentSets[i]; ++k )
-      {
-         include_in_cut = FALSE;
-         for( l = 0; l < psd->nParents[i][k]; ++l )
-         {
-            if ( incluster[psd->ParentSets[i][k][l]] ) 
-            {
-               include_in_cut = TRUE;
-               break;
-            }
-         }
+/*       /\* include all parents sets with at least one parent in the cluster *\/ */
+/*       for( k = 0;  k < psd->nParentSets[i]; ++k ) */
+/*       { */
+/*          include_in_cut = FALSE; */
+/*          for( l = 0; l < psd->nParents[i][k]; ++l ) */
+/*          { */
+/*             if ( incluster[psd->ParentSets[i][k][l]] )  */
+/*             { */
+/*                include_in_cut = TRUE; */
+/*                break; */
+/*             } */
+/*          } */
 
-         if( include_in_cut )
-            included[n_included++] = psd->PaVars[i][k];
-         else
-            excluded[n_excluded++] = psd->PaVars[i][k];
-      }
+/*          if( include_in_cut ) */
+/*             included[n_included++] = psd->PaVars[i][k]; */
+/*          else */
+/*             excluded[n_excluded++] = psd->PaVars[i][k]; */
+/*       } */
       
-      /* Use convexity constraint to reduce number of variables in the cut */
-      if( n_excluded < psd->nParentSets[i]  / 2 )
-      {
-         SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_excluded, excluded, -1.0) );
-         rhs--;
-      }
-      else
-         SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_included, included, 1.0) );
-   }
+/*       /\* Use convexity constraint to reduce number of variables in the cut *\/ */
+/*       if( n_excluded < psd->nParentSets[i]  / 2 ) */
+/*       { */
+/*          SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_excluded, excluded, -1.0) ); */
+/*          rhs--; */
+/*       } */
+/*       else */
+/*          SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cut, n_included, included, 1.0) ); */
+/*    } */
 
-   SCIPfreeBufferArray(scip, &excluded);
-   SCIPfreeBufferArray(scip, &included);
+/*    SCIPfreeBufferArray(scip, &excluded); */
+/*    SCIPfreeBufferArray(scip, &included); */
 
-   SCIP_CALL( SCIPchgRowRhs(scip, cut, rhs) );
-   assert(SCIPisIntegral(scip, rhs));
-   SCIPdebugMessage(" -> Cluster-cut <clustercut>: act=%f, rhs=%f, norm=%f, eff=%f, min=%f, max=%f (range=%f)\n",
-                    SCIPgetRowLPActivity(scip, cut), SCIProwGetRhs(cut), SCIProwGetNorm(cut),
-                    SCIPgetCutEfficacy(scip, NULL, cut),
-                    SCIPgetRowMinCoef(scip, cut), SCIPgetRowMaxCoef(scip, cut),
-                    SCIPgetRowMaxCoef(scip, cut) / SCIPgetRowMinCoef(scip, cut));
-   SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cut, NULL) ));
+/*    SCIP_CALL( SCIPchgRowRhs(scip, cut, rhs) ); */
+/*    assert(SCIPisIntegral(scip, rhs)); */
+/*    SCIPdebugMessage(" -> Cluster-cut <clustercut>: act=%f, rhs=%f, norm=%f, eff=%f, min=%f, max=%f (range=%f)\n", */
+/*                     SCIPgetRowLPActivity(scip, cut), SCIProwGetRhs(cut), SCIProwGetNorm(cut), */
+/*                     SCIPgetCutEfficacy(scip, NULL, cut), */
+/*                     SCIPgetRowMinCoef(scip, cut), SCIPgetRowMaxCoef(scip, cut), */
+/*                     SCIPgetRowMaxCoef(scip, cut) / SCIPgetRowMinCoef(scip, cut)); */
+/*    SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cut, NULL) )); */
 
-   SCIP_CALL( SCIPaddRow(scip, cut, forcecuts, cutoff) );
-   if( *cutoff )
-   {
-      SCIPdebugMessage("Cluster cut led to cutoff\n");
-      SCIP_CALL( SCIPreleaseRow(scip, &cut) );
-      return SCIP_OKAY;
-   }
+/*    SCIP_CALL( SCIPaddRow(scip, cut, forcecuts, cutoff) ); */
+/*    if( *cutoff ) */
+/*    { */
+/*       SCIPdebugMessage("Cluster cut led to cutoff\n"); */
+/*       SCIP_CALL( SCIPreleaseRow(scip, &cut) ); */
+/*       return SCIP_OKAY; */
+/*    } */
 
-   if( addtopool )
-      SCIP_CALL( SCIPaddPoolCut(scip, cut) );
+/*    if( addtopool ) */
+/*       SCIP_CALL( SCIPaddPoolCut(scip, cut) ); */
 
-   if( SCIPisCutEfficacious(scip, sol, cut) )
-      *found_efficacious_ptr = TRUE;
+/*    if( SCIPisCutEfficacious(scip, sol, cut) ) */
+/*       *found_efficacious_ptr = TRUE; */
 
-   SCIP_CALL( SCIPreleaseRow(scip, &cut) );
+/*    SCIP_CALL( SCIPreleaseRow(scip, &cut) ); */
 
-   return SCIP_OKAY;
-}
-#endif
+/*    return SCIP_OKAY; */
+/* } */
+
 
 /** main routine for looking for cutting planes
 
@@ -956,7 +978,10 @@ extern SCIP_RETCODE IP_findCuts(
    SCIP_Bool       matroidpaircuts,
    int             matroidpaircutslimit,
    int             matroidpairmaxcuts,
-   SCIP_Bool*      cutoff                   /**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) */
+   SCIP_Bool*      cutoff,                   /**< cutoff = TRUE if a cut is added which leads to a cutoff ( set by SCIPaddRow ) */
+   CLUSTER_CUT***  cluster_cuts,             /**< used to return the cuts themselves */
+   SCIP_Bool       storecuts,
+   SCIP_Bool       knapsackonly
 )
 {
 
@@ -1000,7 +1025,9 @@ extern SCIP_RETCODE IP_findCuts(
    SCIP_CONS*      auxipdata_incumbentcons;    /**< (optional) constraint that incumbent must lie on cluster cut */
 
    SCIP_Real excess;
-   
+
+   CLUSTER_CUT*   cluster_cut;                /**< stores each found cluster cut */
+
    /* check called with sensible 'k' values */
 
    assert(k_lb > 0);
@@ -1374,6 +1401,10 @@ extern SCIP_RETCODE IP_findCuts(
 
    SCIP_CALL( SCIPallocBufferArray(scip, &incluster, psd->n) );
 
+   if( storecuts )
+      /* at most nsols cuts will be added */
+      SCIP_CALL( SCIPallocBlockMemoryArray(scip, cluster_cuts, nsols) );
+
    for( s = 0; s <  nsols; ++s )
    {
       subscip_sol = subscip_sols[s];
@@ -1410,7 +1441,11 @@ extern SCIP_RETCODE IP_findCuts(
             incluster[i] = FALSE;
 
       SCIP_CALL( AddClusterCut(scip, psd, conshdlr, sol, incluster, cluster_size, kval,
-            addtopool, forcecuts, found_efficacious_ptr, ci_cut, matroidpaircuts, matroidpaircutslimit, matroidpairmaxcuts, excess, cutoff) );
+            addtopool, forcecuts, found_efficacious_ptr, ci_cut, matroidpaircuts, matroidpaircutslimit, matroidpairmaxcuts,
+            excess, cutoff, &cluster_cut, storecuts, knapsackonly) );
+
+      if( storecuts )
+         (*cluster_cuts)[*nGen] = cluster_cut;
       
       if( *cutoff )
       {
@@ -1421,6 +1456,10 @@ extern SCIP_RETCODE IP_findCuts(
       (*nGen)++;
    }
 
+   if( storecuts )
+      /* *nGen cuts added, shrink store of cluster cuts appropriately */
+      SCIP_CALL( SCIPreallocBlockMemoryArray(scip, cluster_cuts, nsols, *nGen) );
+   
    SCIPfreeBufferArray(scip, &incluster);
 
    SCIPdebugMessage("added %d cluster cuts.\n", *nGen);

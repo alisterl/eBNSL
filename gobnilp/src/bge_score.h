@@ -29,14 +29,16 @@
  * Function declarations for bge_score.c
  */
 
+#include <scip/scip.h>
 #include "bge_matrix.h"
+#include "scorecache.h"
 
 #ifndef __BGE_SCORE_H__
 #define __BGE_SCORE_H__
 
-extern double LogBgeScore(int node, unsigned int * family, int no_parents, int alpha_mu, int alpha_omega,
+extern double LogBgeScore(int node, unsigned int* family, unsigned int* ordered_family, int no_parents, int alpha_mu, int alpha_omega,
               double log_prefactor,double* log_gamma_ratio_table, Bge_Matrix* prior_matrix,
-              Bge_Matrix* posterior_matrix, Bge_Matrix* data);
+   Bge_Matrix* posterior_matrix, Bge_Matrix* data, SCORECACHE* scorecache, SCIP* scip);
 
 extern double log_gamma_ratio(int samples, int alpha_omega, int total_no_nodes, int no_nodes);
 
@@ -47,9 +49,9 @@ extern double * create_log_gamma_ratio_table(int samples, int alpha_omega, int n
 extern double LogBgeScoreWithoutParents( int node, int alpha_mu, int alpha_omega, double log_prefactor,
               double* log_gamma_ratio_table, Bge_Matrix* prior_matrix, Bge_Matrix* posterior_matrix, Bge_Matrix* data);
 
-extern double LogBgeScoreWithParents(int node, unsigned int *family, int no_parents,
+extern double LogBgeScoreWithParents(int node, unsigned int *family, unsigned int *ordered_family, int no_parents,
               int alpha_mu, int alpha_omega, double log_prefactor,
               double *log_gamma_ratio_table, Bge_Matrix* prior_matrix,
-              Bge_Matrix* posterior_matrix, Bge_Matrix* data);
+   Bge_Matrix* posterior_matrix, Bge_Matrix* data, SCORECACHE* scorecache, SCIP* scip);
 
 #endif

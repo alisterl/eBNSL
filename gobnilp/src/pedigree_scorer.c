@@ -455,7 +455,7 @@ SCIP_RETCODE countFrequencies(
    }
 
    for( i = 0; i < num_markers / 2; i++ )
-      for( j = 0; j < (*num_alleles)[i / 2]; j++ )
+      for( j = 0; j < (*num_alleles)[i]; j++ )
          (*counts)[i][j] = (*counts)[i][j] / num_nonmissing_alleles[j / 2];
 
    for( i = 0; i < num_markers / 2; i++ )

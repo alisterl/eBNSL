@@ -39,7 +39,7 @@
 #include "scip/scip.h"
 #include "pedigrees.h"
 #include "parent_set_data.h"
-#include "metadata.h"
+#include "probdata_bn.h"
 #include "utils.h"
 #include "scip/pub_var.h"
 
@@ -191,6 +191,9 @@ SCIP_DECL_HEUREXEC(heurExecSinks)
    int h;
 
    SCIP_SOL* dr_sol = NULL;
+
+   SCIP_PROBDATA* probdata;
+
    
    assert(strcmp(SCIPheurGetName(heur), HEUR_NAME) == 0);
    assert(result != NULL);
@@ -198,7 +201,12 @@ SCIP_DECL_HEUREXEC(heurExecSinks)
 
    *result = SCIP_DIDNOTRUN;
 
-   psd = MD_getParentSetData(scip);
+   /* this is a problem specific heuristic so ... */
+   /* get problem data */
+   probdata = SCIPgetProbData(scip);
+   assert( probdata != NULL );
+   
+   psd = probdata->psd;
    if( psd == NULL )
    {
       SCIPdebugMessage("Couldn't find parent set data structure.\n");

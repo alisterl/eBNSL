@@ -32,28 +32,32 @@
 #include <string.h>
 #include "set_packing_cuts.h"
 #include "utils.h"
+#include "probdata_bn.h"
 #include "scip/scipdefplugins.h"
 
 
+
+
+
+/** Adds a set packing constraint and stores it in the problem data structure
+ */
 static 
 SCIP_Bool add_spc_constraint(
-   SCIP* scip, 
+   SCIP* scip,
    ParentSetData* psd, 
-   SCIP_Bool*** store, 
    int* cluster, 
    int cluster_size, 
    int highest_index, 
-   SCIP_Bool propagate
+   SCIP_Bool propagate,
+   int* size,
+   SCIP_Bool releasecons
    )
 {
    int i;
    int k;
-   int kk;
+   int l;
    int ci;
    int ci2;
-   int* k_indices;
-   int n_k_indices;
-   int k_indices_size = 0;
 
    int parent;
 
@@ -61,124 +65,145 @@ SCIP_Bool add_spc_constraint(
    char tmp_str[SCIP_MAXSTRLEN];
    SCIP_CONS* cons;
 
-   SCIP_Bool first;
-   SCIP_Bool ok = TRUE;
-
    int* new_cluster;
 
-   /* find which element of the cluster has the most parent sets */
+   int nvars = 0;
+   int maxnvars = 0;
+   SCIP_VAR** vars;
+   SCIP_Bool found_one;
+   SCIP_Bool ok;
+
+   SCIP_PROBDATA* probdata;
+   
+   /* get problem data */
+   probdata = SCIPgetProbData(scip);
+   assert( probdata != NULL );
+   
+   /* allocate (typically more than enough)  space for all variables in the constraint */
    for( ci = 0 ; ci < cluster_size ; ++ci )
-      if( psd->nParentSets[cluster[ci]] > k_indices_size )
-         k_indices_size = psd->nParentSets[cluster[ci]];
-   SCIP_CALL( SCIPallocMemoryArray(scip, &k_indices, k_indices_size) );
+      maxnvars += psd->nParentSets[cluster[ci]];
+   SCIP_CALL( SCIPallocBufferArray(scip, &vars, maxnvars) );
 
    /* construct name for the constraint */
    (void) SCIPsnprintf(cluster_name, SCIP_MAXSTRLEN, "spc(");
    for( ci = 0 ; ci < cluster_size ; ++ci )
    {
-      (void) SCIPsnprintf(tmp_str, SCIP_MAXSTRLEN, "%d,", cluster[ci]);
+      (void) SCIPsnprintf(tmp_str, SCIP_MAXSTRLEN, "%s,", psd->nodeNames[cluster[ci]]);
       (void) strcat(cluster_name, tmp_str);
    }
    (void) strcat(cluster_name, ")");
-
-   /* lazily create linear constraint, SCIP will upgrade it to set packing */
-   SCIP_CALL(SCIPcreateConsLinear(scip, &cons, cluster_name, 0, NULL, NULL,
-                                  -SCIPinfinity(scip),
-                                  1,
-                                  TRUE,
-                                  TRUE,  /* separation here */
-                                  FALSE,  /* no need to enforce */
-                                  FALSE,  /* no need to check */
-                                  propagate,
-                                  FALSE, FALSE, FALSE, FALSE, FALSE));
-
 
    for( ci = 0; ci < cluster_size; ++ci )
    {
       i = cluster[ci];
 
-      /* find all (indices of) parent sets for i containing
+      /* find all (parent sets for i containing
          all of the other elements in cluster
       */
-      first = TRUE;
-      n_k_indices = 0;
-      for( ci2 = 0; ci2 < cluster_size; ++ci2 )
+      found_one = FALSE;
+      for( k = 0; k < psd->nParentSets[i]; ++k )
       {
-         if( ci == ci2 )
-            continue;
+         SCIP_Bool all_there = TRUE;
+         for( ci2 = 0; ci2 < cluster_size; ++ci2 )
+         {
+            if( ci == ci2 )
+               continue;
 
-         parent = cluster[ci2];
-         if( first )
-         {
-            /* for first 'parent' just copy ( indices of ) parent
-               sets containing the 'parent' into k_indices
-            */
-            for( k = 0; k < psd->nParentSets[i]; ++k )
-               if( store[i][k][parent] )
-                  k_indices[n_k_indices++] = k;
-            first = FALSE;
-         }
-         else
-         {
-            /* for non-first parents, remove from k_indices
-               those ( indices of ) parents sets not containing parent
-            */
-            kk = 0;
-            while( kk < n_k_indices )
+            parent = cluster[ci2];
+            ok = FALSE;
+            for( l = 0; l < psd->nParents[i][k]; l++)
             {
-               if( !store[i][k_indices[kk]][parent] )
+               if( psd->ParentSets[i][k][l] == parent )
                {
-                  /* parent missing, remove entry from k_indices */
-                  n_k_indices--;
-                  if( kk < n_k_indices )
-                     k_indices[kk] = k_indices[n_k_indices];
+                  ok = TRUE;
+                  break;
                }
-               else
-                  kk++;
+            }
+            
+            if( !ok )
+            {
+               all_there = FALSE;
+               break;
             }
          }
+         
+         if( all_there )
+         {
+            found_one = TRUE;
+            vars[nvars++] = psd->PaVars[i][k];
+         }
       }
-      if( n_k_indices == 0 )
+
+      if( !found_one )
       {
-         ok = FALSE;
+         /* no parent set for i in the constraint
+            so give up on this cluster */
          break;
       }
-      /* now have correct indices in k_indices*/
-      for( kk = 0; kk < n_k_indices; ++kk )
-         SCIP_CALL( SCIPaddCoefLinear(scip, cons, psd->PaVars[i][k_indices[kk]], 1) );
    }
 
-   if( ok )
+   if( found_one )
    {
+      SCIP_CALL( SCIPcreateConsSetpack(
+            scip,
+            &cons,
+            cluster_name,
+            nvars,
+            vars,   
+            TRUE,        /*initial,*/
+            TRUE,        /* separate, */
+            TRUE,        /* enforce */
+            TRUE,        /* check */
+            propagate,   /* propagate */
+            FALSE,       /* local */
+            FALSE,       /* modifiable */
+            FALSE,       /* dynamic */
+            FALSE,       /* removable */
+            FALSE        /* stickingatnode */
+            ));
+
       SCIP_CALL( SCIPaddCons(scip, cons) );
       /*SCIP_CALL(  SCIPprintCons(scip, cons, NULL)  );*/
-   }
-   SCIP_CALL( SCIPreleaseCons(scip, &cons) );
-   SCIPfreeMemoryArray(scip, &k_indices);
+      
+      /* ensure enough space */
+      if( probdata->nspc_conss + 1 > *size)
+      {
+          int newsize;
 
-   /* if ok looking for 'bigger' spc constraints */
-   if( ok )
-   {
-      SCIP_CALL( SCIPallocMemoryArray(scip, &new_cluster, cluster_size + 1) );
+          newsize = SCIPcalcMemGrowSize(scip, probdata->nspc_conss + 1);
+          SCIP_CALL( SCIPreallocBlockMemoryArray(scip, &probdata->spc_conss, *size, newsize) );
+          *size = newsize;
+      }
+      
+      /* store the constraint, and associated info */
+      SCIP_CALL( storeclustercut(scip, &(probdata->spc_conss[probdata->nspc_conss++]),
+            cons, NULL, cluster_size, cluster, cluster_size - 1) );
+
+      if( releasecons )
+         SCIP_CALL( SCIPreleaseCons(scip, &cons) );
+
+      SCIP_CALL( SCIPallocBlockMemoryArray(scip, &new_cluster, cluster_size + 1) );
       for( ci = 0; ci < cluster_size; ++ci )
          new_cluster[ci] = cluster[ci];
       for( i = highest_index + 1; i < psd->n; ++i )
       {
          new_cluster[cluster_size] = i;
-         add_spc_constraint(scip, psd, store, new_cluster, cluster_size + 1, i, propagate);
+         add_spc_constraint(scip, psd, new_cluster, cluster_size + 1, i, propagate, size, releasecons);
       }
-      SCIPfreeMemoryArray(scip, &new_cluster);
+      SCIPfreeBlockMemoryArray(scip, &new_cluster, cluster_size + 1);
    }
 
-   return ok;
+   /* clean up */
+   SCIPfreeBufferArray(scip, &vars);
+
+   return found_one;
 }
+
 
 
 SCIP_RETCODE SP_add_spc_constraints(
    SCIP* scip, 
-   ParentSetData* psd, 
-   SCIP_Bool*** store, 
-   SCIP_Bool propagate
+   ParentSetData* psd
    )
 
 {   
@@ -186,31 +211,46 @@ SCIP_RETCODE SP_add_spc_constraints(
    int j;
    int k;
    int cluster[3];
+   int size = 0;
+   SCIP_Bool propagate;
+   SCIP_Bool addspc;
+   SCIP_Bool pricing;
+   
+   SCIP_PROBDATA* probdata;
+
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/propagatespc", &propagate) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/addspc", &addspc) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pricing", &pricing) );
+
+   if( !addspc )
+      return SCIP_OKAY;
+
    
    /* start with clusters of size 3, clusters of size 2 already dealt
-      with by edge variables
+      with by arrow constraints
    */
    for( i = 0; i < psd->n; i++ )
    {
       cluster[0] = i;
       for( j = i + 1; j < psd->n; j++ )
       {
-         /* if any arrows missing then we will not get a set-packing constraint */
-         if( get_arrow(psd,i,j) == NULL || get_arrow(psd,j,i) == NULL )
-            continue;
-         
          cluster[1] = j;
          for( k = j + 1; k < psd->n; k++ )
          {
-            /* if any arrows missing then we will not get a set-packing constraint */
-            if( get_arrow(psd,i,k) == NULL || get_arrow(psd,k,i) == NULL 
-               || get_arrow(psd,j,k) == NULL || get_arrow(psd,k,j) == NULL )
-               continue;
-
             cluster[2] = k;
-            add_spc_constraint(scip, psd, store, cluster, 3, k, propagate);
+            /* if we are not pricing then the cons should be released here */
+            add_spc_constraint(scip, psd, cluster, 3, k, propagate, &size, !pricing);
          }
       }
    }
+
+   /* shrink arrays appropriately */
+
+   /* get problem data */
+   probdata = SCIPgetProbData(scip);
+   assert( probdata != NULL );
+
+   SCIP_CALL( SCIPreallocBlockMemoryArray(scip, &probdata->spc_conss, size, probdata->nspc_conss) );
+   
    return SCIP_OKAY;
 }

@@ -136,13 +136,23 @@ void SetPriorParametricMatrix(
      }
 
    }
+
+   /* printf("prior matrix\n"); */
+   /* for( i = 0; i < n; i++ ) */
+   /* { */
+   /*    for( j = 0; j < n; j++ ) */
+   /*       printf("%g ", prior_matrix->items[n*i+j]); */
+   /*    printf("\n"); */
+   /* } */
+   /* printf("\n\n"); */
+   
  }
 
-/** Sets the posterior matrix of the normal wishart disturbution over precision matrix W
+/** Sets the posterior matrix of the normal-Wishart disturbution over precision matrix W
 * and mean v
 * @param data the problem data set
 * @param the prior matrix for the wishart disturbution over the precision matrix W
-* @param posterior_matrix the posterior matrix that is set for the normal wishart joint
+* @param posterior_matrix the posterior matrix that is set for the normal-Wishart joint
 * disturbution over the precision matrix and mean
 */
 void SetPosteriorParametricMatrix(
@@ -150,39 +160,62 @@ void SetPosteriorParametricMatrix(
    Bge_Matrix* prior_matrix,
    Bge_Matrix* posterior_matrix,
    int alpha_mu,
-   int alpha_omega
-)
+   int alpha_omega,
+   Bge_Vector* nu
+   )
 {
 
-  int n         = data->cols; /* number of varibles in the data set */
-  int obvs      = data->rows; /* the number of observations in the data set*/
-  double scalar = (double) (obvs * alpha_mu) / (double) (obvs + alpha_mu);
+   int n         = data->cols; /* number of variables in the data set */
+   
+   Bge_Matrix* variance_matrix = BgeMatrixCreate(n,n);
+   Bge_Vector* mean_vec        = BgeVectorCreate(n);
 
-  /* allocate memory to all the neccessary matrices/vectors for computing the posterior matrix */
-  Bge_Vector* mean_vec        = BgeVectorCreate(n);
-  Bge_Matrix* variance_matrix = BgeMatrixCreate(n,n);
-  Bge_Matrix* tmp_matrix      = BgeMatrixCreate(n,n); /* the output of outerproduct(mean_vec, mean_vec) */
+   int i,j;
+   
+   /* initialize the mean vector, the variance matrix */
+   SetSampleMean(data, mean_vec);
+   SetSampleVariance(data, mean_vec, variance_matrix);
+   SetPriorParametricMatrix(n, alpha_mu, alpha_omega, prior_matrix);
 
-  assert(prior_matrix->cols == posterior_matrix->cols);
-  assert(prior_matrix->rows == posterior_matrix->rows);
+   assert(prior_matrix->cols == posterior_matrix->cols);
+   assert(prior_matrix->rows == posterior_matrix->rows);
 
-  
-  /* initialize the mean vector, the variance matrix */
-  SetSampleMean(data, mean_vec);
-  SetSampleVariance(data, mean_vec, variance_matrix);
-  SetPriorParametricMatrix(n, alpha_mu, alpha_omega, prior_matrix);
+   if( nu == NULL )
+   {
+      BgeMatrixAddition(variance_matrix, prior_matrix, posterior_matrix);
+   }
+   else
+   {
+      int obvs      = data->rows; /* the number of observations in the data set*/
+      double scalar = (double) (obvs * alpha_mu) / (double) (obvs + alpha_mu);
+      Bge_Vector* tmp_vec        = BgeVectorCreate(n);
+      Bge_Matrix* tmp_matrix      = BgeMatrixCreate(n,n); /* the output of outerproduct(mean_vec, mean_vec) */
 
-  /* computations to set the posterior_matrix */
-  BgeVectorOuterProduct(mean_vec, mean_vec, tmp_matrix); /* assumes that v vector = [0,0...0] */
-  //print_matrix_rowmajor( "temp matrix",tmp_matrix->rows, tmp_matrix->rows, tmp_matrix->items, tmp_matrix->rows );
-  BgeMatrixScalarMultipliciation(scalar, tmp_matrix);
+      assert(nu->capacity == n);
+      
+      BgeVectorSubtraction(nu,mean_vec,tmp_vec);
+      /* computations to set the posterior_matrix */
+      BgeVectorOuterProduct(tmp_vec, tmp_vec, tmp_matrix); 
+      //print_matrix_rowmajor( "temp matrix",tmp_matrix->rows, tmp_matrix->rows, tmp_matrix->items, tmp_matrix->rows );
+      BgeMatrixScalarMultipliciation(scalar, tmp_matrix);
+      
+      //print_matrix_rowmajor( "temp matrix",tmp_matrix->rows, tmp_matrix->rows, tmp_matrix->items, tmp_matrix->rows );
+      BgeMatrixAddition(variance_matrix, prior_matrix, posterior_matrix);
+      BgeMatrixAddition(tmp_matrix, posterior_matrix, posterior_matrix);
+      
+      /* Free all memory allocated to matrices/vectors no longer needed */
+      BgeMatrixDelete(&tmp_matrix);
+      BgeVectorDelete(&tmp_vec);
+   }
+   BgeMatrixDelete(&variance_matrix);
+   BgeVectorDelete(&mean_vec);
 
-  //print_matrix_rowmajor( "temp matrix",tmp_matrix->rows, tmp_matrix->rows, tmp_matrix->items, tmp_matrix->rows );
-  BgeMatrixAddition(variance_matrix, prior_matrix, posterior_matrix);
-  BgeMatrixAddition(tmp_matrix, posterior_matrix, posterior_matrix);
+   /* for( i = 0; i < n; i++ ) */
+   /* { */
+   /*    for( j = 0; j < n; j++ ) */
+   /*       printf("%g ", posterior_matrix->items[n*i+j]); */
+   /*    printf("\n"); */
+   /* } */
 
-  /* Free all memory allocated to matrices/vectors no longer needed */
-  BgeMatrixDelete(&variance_matrix);
-  BgeMatrixDelete(&tmp_matrix);
-  BgeVectorDelete(&mean_vec);
+   
 }

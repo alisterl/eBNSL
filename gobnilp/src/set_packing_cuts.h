@@ -35,6 +35,6 @@
 #include "scip/scip.h"
 #include "parent_set_data.h"
 
-extern SCIP_RETCODE SP_add_spc_constraints(SCIP* scip, ParentSetData* psd, SCIP_Bool*** store, SCIP_Bool propagate);
+extern SCIP_RETCODE SP_add_spc_constraints(SCIP* scip, ParentSetData* psd);
 
 #endif

@@ -165,20 +165,26 @@ void BgeMatrixSetPosteriorParentMatrix(
    Bge_Matrix* parent_posterior
 )
 {
-   int i; /* index to iterate over rows */
+   int i; /* sub_posterior->cols * index to iterate over rows */
    int j; /* index to iterate over columns */
    int k; /* index to keep track of parent_posterior index */
 
    k = 0;
 
-   for(i = 1; i < sub_posterior->rows; i++)
-   {
+   /* originally was this: */
+   /* for(i = 1; i < sub_posterior->rows; i++) */
+   /* { */
+   /*   for(j = 1; j < sub_posterior->cols; j++) */
+   /*   { */
+   /*     parent_posterior->items[k] = sub_posterior->items[(sub_posterior->cols * i) + j]; */
+   /*     k++; */
+   /*   } */
+   /* } */
+
+   
+   for(i = sub_posterior->cols; i < sub_posterior->cols * sub_posterior->rows; i+= sub_posterior->cols)
      for(j = 1; j < sub_posterior->cols; j++)
-     {
-       parent_posterior->items[k] = sub_posterior->items[(sub_posterior->cols * i) + j];
-       k++;
-     }
-   }
+       parent_posterior->items[k++] = sub_posterior->items[i + j];
 }
 
 /** Returns the Posterior matrix restricted to a family of a node

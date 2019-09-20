@@ -50,7 +50,7 @@ SCIP_Bool PD_inPedigreeMode(
    )
 {
    SCIP_Bool pedigreemode;
-   SCIPgetBoolParam(scip, "gobnilp/pedigreemode", &pedigreemode);
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pedigreemode", &pedigreemode) );
    return pedigreemode;
 }
 /** Checks whether the program is enforcing sex consistency.
@@ -70,8 +70,8 @@ SCIP_Bool usingSexConsistency(
    {
       SCIP_Bool sexconsistentold;
       SCIP_Bool sexconsistentnew;
-      SCIPgetBoolParam(scip, "gobnilp/sexconsistent", &sexconsistentold);
-      SCIPgetBoolParam(scip, "gobnilp/pedigree/sexconsistent", &sexconsistentnew);
+      SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/sexconsistent", &sexconsistentold) );
+      SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pedigree/sexconsistent", &sexconsistentnew) );
       if( sexconsistentnew )
       {
          return TRUE;

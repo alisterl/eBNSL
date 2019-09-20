@@ -34,8 +34,16 @@
 
 #include "scip/scip.h"
 #include "parent_set_data.h"
+/* the following include for CLUSTER_CUT data structure */
+#include "probdata_bn.h"
+#include "cons_dagcluster.h"
 #include "solution_info.h"
 
-extern SCIP_RETCODE IP_findCuts(SCIP* scip, ParentSetData* psd, SolutionInfo* solinfo, SCIP_SOL* sol, int* nGen, int k_lb, int k_ub, SCIP_CONSHDLR* conshdlr, SCIP_Bool addtopool, SCIP_Bool forcecuts, SCIP_Bool* found_efficacious_ptr, SCIP_Real limits_time, SCIP_Real limits_gap, SCIP_Real limits_absgap, SCIP_Bool incumbent_cons, int* must_be_included, int n_must_be_included, int*  must_be_excluded, int n_must_be_excluded, SCIP_Bool ci_cut,  SCIP_Bool matroidpaircuts,  int matroidpaircutslimit, int matroidpairmaxcuts, SCIP_Bool* cutoff);
+extern SCIP_RETCODE IP_findCuts(SCIP* scip, ParentSetData* psd, SolutionInfo* solinfo, SCIP_SOL* sol,
+   int* nGen, int k_lb, int k_ub, SCIP_CONSHDLR* conshdlr, SCIP_Bool addtopool, SCIP_Bool forcecuts,
+   SCIP_Bool* found_efficacious_ptr, SCIP_Real limits_time, SCIP_Real limits_gap, SCIP_Real limits_absgap,
+   SCIP_Bool incumbent_cons, int* must_be_included, int n_must_be_included, int*  must_be_excluded,
+   int n_must_be_excluded, SCIP_Bool ci_cut,  SCIP_Bool matroidpaircuts,  int matroidpaircutslimit,
+   int matroidpairmaxcuts, SCIP_Bool* cutoff, CLUSTER_CUT*** cluster_cuts, SCIP_Bool storecuts, SCIP_Bool knapsackonly);
 
 #endif

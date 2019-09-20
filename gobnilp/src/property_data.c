@@ -510,15 +510,40 @@ SCIP_RETCODE PR_setGlobalPropertyFromArray(
 {
    int i;
    char tmp_value[SCIP_MAXSTRLEN];
+   int tmp_len = 0;
+   SCIP_Bool toolong = FALSE;
    tmp_value[0] = '\0';
    for( i = 0; i < length; i++ )
    {
       if( i > 0 )
+      {
+         tmp_len++;
+         if( tmp_len > SCIP_MAXSTRLEN )
+         {
+            toolong = TRUE;
+            break;
+         }
          strcat(tmp_value, " ");
+      }
+      tmp_len += strlen(value[i]);
+      if( tmp_len > SCIP_MAXSTRLEN )
+      {
+         toolong = TRUE;
+         break;
+      }
       strcat(tmp_value, value[i]);
    }
-   SCIP_CALL( PR_setGlobalProperty(scip, pd, name, tmp_value) );
-   return SCIP_OKAY;
+   
+   if( toolong )
+   {
+      SCIPerrorMessage("This string too long for global property value:\n%s\n", tmp_value);
+      return SCIP_ERROR;
+   }
+   else
+   {
+      SCIP_CALL( PR_setGlobalProperty(scip, pd, name, tmp_value) );
+      return SCIP_OKAY;
+   }
 }
 
 /** Set a global property to a given value 
@@ -697,15 +722,38 @@ SCIP_RETCODE PR_setPropertyFromArray(
 {
    int i;
    char tmp_value[SCIP_MAXSTRLEN];
+   int tmp_len = 0;
+   SCIP_Bool toolong = FALSE;
    tmp_value[0] = '\0';
    for( i = 0; i < length; i++ )
    {
       if( i > 0 )
+      {
+         tmp_len++;
+         if( tmp_len > SCIP_MAXSTRLEN )
+         {
+            toolong = TRUE;
+            break;
+         }
          strcat(tmp_value, " ");
+      }
+      tmp_len += strlen(value[i]);
+      if( tmp_len > SCIP_MAXSTRLEN )
+      {  toolong = TRUE;
+         break;
+      }
       strcat(tmp_value, value[i]);
    }
-   SCIP_CALL( PR_setProperty(scip, pd, individual, name, tmp_value) );
-   return SCIP_OKAY;
+   if( toolong )
+   {
+      SCIPerrorMessage("This string too long for global property value:\n%s\n", tmp_value);
+      return SCIP_ERROR;
+   }
+   else
+   {
+       SCIP_CALL( PR_setProperty(scip, pd, individual, name, tmp_value) );
+       return SCIP_OKAY;
+   }
 }
 /** Set a property for an individual to a given value 
  * Value is converted from an array of reals to a string

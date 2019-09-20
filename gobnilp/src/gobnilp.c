@@ -247,6 +247,9 @@
 #include "probdata_bn.h"
 #include "utils.h"
 
+#include "scip/struct_set.h"
+#include "scip/struct_scip.h" 
+
 /** The default file from which to attempt to read parameters. */
 #define DEFAULT_GOBNILP_PARAMS_FILE "gobnilp.set"
 

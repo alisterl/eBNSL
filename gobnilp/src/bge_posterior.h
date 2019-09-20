@@ -42,6 +42,6 @@ extern void SetSampleVariance( Bge_Matrix* data, Bge_Vector* mean_vec, Bge_Matri
 extern void SetPriorParametricMatrix(int n, int alpha_mu, int alpha_omega, Bge_Matrix* prior_matrix);
 
 extern void SetPosteriorParametricMatrix(Bge_Matrix* data, Bge_Matrix* prior_matrix, Bge_Matrix*
-            posterior_matrix, int alpha_mu, int alpha_omega);
+   posterior_matrix, int alpha_mu, int alpha_omega, Bge_Vector* nu);
 
 #endif

@@ -32,7 +32,7 @@
 #ifndef __BGE_MATRIX_H__
 #define __BGE_MATRIX_H__
 
- #include <lapacke.h>
+#include <lapacke.h>
 #include "bge_vector.h"
 
 /** A list of double values. */

@@ -870,7 +870,7 @@ static SCIP_DECL_CONSSEPALP(consSepalpCi)
    SCIP_Bool cutoff = FALSE;
 
    ParentSetData* psd;
-   
+
    assert(scip != NULL);
    assert(conshdlr != NULL);
    assert(strcmp(SCIPconshdlrGetName(conshdlr), CONSHDLR_NAME) == 0);
@@ -913,8 +913,14 @@ static SCIP_DECL_CONSSEPALP(consSepalpCi)
          for( b_i = 0; b_i < consdata->n_b; ++b_i )
          {
             must_be_included[1] = consdata->b[b_i];
-            SCIP_CALL( IP_findCuts(scip, psd, &solinfo, NULL, &nGen, 1, 1, conshdlr, FALSE, conshdlrdata->forcecuts, &found_efficacious, DEFAULT_TIMELIMIT, DEFAULT_GAPLIMIT, DEFAULT_ABSGAPLIMIT, FALSE, must_be_included, 2, s, n_s, TRUE, FALSE, 0, 0, &cutoff) );
-
+            SCIP_CALL( IP_findCuts(scip, psd, &solinfo, NULL, &nGen, 1, 1, conshdlr, FALSE,
+                  conshdlrdata->forcecuts, &found_efficacious,
+                  DEFAULT_TIMELIMIT, DEFAULT_GAPLIMIT, DEFAULT_ABSGAPLIMIT, FALSE,
+                  must_be_included, 2, s, n_s, TRUE, FALSE, 0, 0, &cutoff, NULL,
+                  FALSE,   /* do not store ci cuts */
+                  TRUE    /* only allow knapsack cuts (in case we are pricing) */
+                  ) );
+            
             if( cutoff )
             {
                SCIPdebugMessage("CI constraint <%s> generated cutoff in LP separator.\n", SCIPconsGetName(cons));

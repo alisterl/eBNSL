@@ -49,13 +49,19 @@ in SCIP
 #include "utils.h"
 #include "output.h"
 #include "metadata.h"
-#include "scoring.h"
 #include "scip/misc.h"
 #include "disp_clearcols.h"
 #include "event_splitdag.h"
 #include "cons_lop.h"
 #include "cons_partialordering.h"
 #include "cons_vanilla.h"
+#include "pricer_family.h"
+#include "set_packing_cuts.h"
+#include "branch_dualarrow.h"
+#include "branch_ancestral.h"
+#include "branch_order.h"
+#include "cons_alldifferent.h"
+#include "cons_bestfororder.h"
 
 #define DEFAULT_GOBNILP_INPUT_FORMAT "jkl"
 
@@ -67,18 +73,22 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
 
    int i;
    int j;
+   int n;
 
+   
    assert( probdata != NULL );
    assert( *probdata != NULL );
 
    assert( (*probdata)->psd != NULL );
    assert( (*probdata)->scores != NULL );
 
+   n = (*probdata)->psd->n;
+   
    if( (*probdata)->ancestorvars != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
       {
-         for( j = 0; j < (*probdata)->psd->n; j++ )
+         for( j = 0; j < n; j++ )
             if( i != j )
                SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->ancestorvars)[i][j])) );
          SCIPfreeMemoryArray(scip, &((*probdata)->ancestorvars[i]));
@@ -88,9 +98,9 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
 
    if( (*probdata)->totalordervars != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
       {
-         for( j = 0; j < (*probdata)->psd->n; j++ )
+         for( j = 0; j < n; j++ )
             if( i != j )
                SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->totalordervars)[i][j])) );
          SCIPfreeMemoryArray(scip, &((*probdata)->totalordervars[i]));
@@ -104,12 +114,12 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
       int i1;
       int i2;
       
-      for( i0 = 0; i0 < (*probdata)->psd->n; i0++ )
+      for( i0 = 0; i0 < n; i0++ )
       {
-         for( i1 = i0 + 1; i1 < (*probdata)->psd->n; i1++ )
+         for( i1 = i0 + 1; i1 < n; i1++ )
          {
             int ii1 = i1 - i0 - 1;
-            for( i2 = i1 + 1; i2 < (*probdata)->psd->n; i2++ )
+            for( i2 = i1 + 1; i2 < n; i2++ )
             {
                int ii2 = i2 - i1 - 1;
                if( (*probdata)->imsetvars[i0][ii1][ii2] != NULL ) 
@@ -126,9 +136,9 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
    
    if( (*probdata)->posind != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
       {
-         for( j = 0; j < (*probdata)->psd->n; j++ )
+         for( j = 0; j < n; j++ )
             SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->posind)[i][j])) );
          SCIPfreeMemoryArray(scip, &((*probdata)->posind[i]));
       }
@@ -138,21 +148,21 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
    
    if( (*probdata)->posvars != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
          SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->posvars)[i])) );
       SCIPfreeMemoryArray(scip, &((*probdata)->posvars));
    }
 
    if( (*probdata)->ispa != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
          SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->ispa)[i])) );
       SCIPfreeMemoryArray(scip, &((*probdata)->ispa));
    }
 
    if( (*probdata)->nch != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
          SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->nch)[i])) );
       SCIPfreeMemoryArray(scip, &((*probdata)->nch));
    }
@@ -160,7 +170,7 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
    
    if( (*probdata)->pasize != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
          SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->pasize)[i])) );
       SCIPfreeMemoryArray(scip, &((*probdata)->pasize));
    }
@@ -168,7 +178,7 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
    
    if( (*probdata)->isFemale != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
          SCIP_CALL( SCIPreleaseVar(scip, &(((*probdata)->isFemale)[i])) );
       SCIPfreeMemoryArray(scip, &((*probdata)->isFemale));
    }
@@ -176,19 +186,33 @@ SCIP_DECL_PROBDELORIG(probdelorigBN)
    
    if( (*probdata)->im_vars != NULL )
    {
-      for( i = 0; i < (*probdata)->psd->n; i++ )
+      for( i = 0; i < n; i++ )
       {
-         for( j = 0; j < (*probdata)->psd->n; j++ )
+         for( j = 0; j < n; j++ )
             SCIPfreeMemoryArray(scip, &((*probdata)->im_vars[i][j]));
          SCIPfreeMemoryArray(scip, &((*probdata)->im_vars[i]));
       }
       SCIPfreeMemoryArray(scip, &((*probdata)->im_vars));
    }
 
-   for( i = 0; i < (*probdata)->psd->n; i++ )
+   for( i = 0; i < n; i++ )
       SCIPfreeMemoryArray(scip, &((*probdata)->scores[i]));
    SCIPfreeMemoryArray(scip, &((*probdata)->scores));
    SCIP_CALL( PS_deallocateParentSetData(scip, &((*probdata)->psd), TRUE) );
+
+   for( i = 0; i < (*probdata)->nspc_conss; i++ )
+   {
+      SCIPfreeBlockMemoryArray(scip, &((*probdata)->spc_conss[i]->elts), (*probdata)->spc_conss[i]->nelts);
+      SCIPfreeBlockMemory(scip, &((*probdata)->spc_conss[i]));
+   }
+   SCIPfreeBlockMemoryArray(scip, &((*probdata)->spc_conss), (*probdata)->nspc_conss);
+
+   SCIPfreeBlockMemoryArray(scip, &((*probdata)->one_parent_set), n);
+   if( (*probdata)->arrow_conss != NULL )
+   {
+      SCIPfreeBlockMemoryArray(scip, &((*probdata)->arrow_conss), n*n);
+      SCIPfreeBlockMemoryArray(scip, &((*probdata)->arrow_vars), n*n);
+   }
    
    /* free probdata */
    SCIPfreeMemory(scip, probdata);
@@ -216,10 +240,14 @@ SCIP_RETCODE BN_includePlugins(
    SCIP_CALL( MD_initialiseMetadata(scip) );
    SCIP_CALL( SCIPincludeDispClearCols(scip) );
    SCIP_CALL( SCIPincludeEventHdlrSplitDAG(scip) );
+   SCIP_CALL( SCIPincludePricerFamily(scip) );
+   SCIP_CALL( SCIPincludeBranchruleDualarrow(scip) );
+   SCIP_CALL( SCIPincludeBranchruleAncestral(scip) );
+   SCIP_CALL( SCIPincludeBranchruleOrder(scip) );
+   SCIP_CALL( SCIPincludeConshdlrAlldifferent(scip) );
+   SCIP_CALL( SCIPincludeConshdlrBestfororder(scip) );
    return SCIP_OKAY;
 }
-
-
 
 /** Adds GOBNILP specific parameters to those recognised by SCIP.
  *
@@ -440,7 +468,7 @@ SCIP_RETCODE BN_addParameters(
    SCIP_CALL( UT_addBoolParam(scip,
          "gobnilp/postotal",
          "whether to create position variables indicate position in a total order of BN variables",
-         FALSE
+         TRUE
          ) );
 
 
@@ -574,11 +602,6 @@ SCIP_RETCODE BN_addParameters(
          TRUE
          ) );
 
-   SCIP_CALL( UT_addBoolParam(scip,
-         "gobnilp/ancestralbranching",
-         "whether to impose 'ancestral branching'",
-         FALSE
-         ) );
 
    SCIP_CALL( UT_addBoolParam(scip,
          "gobnilp/arrowvarsinitial",
@@ -636,7 +659,33 @@ SCIP_RETCODE BN_addParameters(
          TRUE
          ) );
 
+   SCIP_CALL( UT_addBoolParam(scip,
+         "gobnilp/propagatespc",
+         "whether to propagate set packing constraints",
+         TRUE
+         ) );
 
+
+   SCIP_CALL( UT_addBoolParam(scip,
+         "gobnilp/addspc",
+         "whether to add set packing constraints",
+         TRUE
+         ) );
+
+   
+   SCIP_CALL( UT_addBoolParam(scip,
+         "gobnilp/pricing",
+         "whether to use pricing to create family variables during solving",
+         FALSE
+         ) );
+
+      SCIP_CALL( UT_addBoolParam(scip,
+         "gobnilp/arrowarrays",
+         "whether to create arrays of size n*n to store all possible arrow variables, and associated constraints",
+         FALSE
+         ) );
+
+   
    
    SCIP_CALL( IO_addOutputParameters(scip) );
    SCIP_CALL( PD_addPedigreeParameters(scip) );
@@ -1075,9 +1124,9 @@ SCIP_RETCODE addPosVariables(
    SCIP_Real indicvals[2] = {1, -1};
    SCIP_VAR* indicvars[2];
 
-   SCIP_Real lb;
-   SCIP_Real ub;
-   SCIP_Real* vals;
+   /* SCIP_Real lb; */
+   /* SCIP_Real ub; */
+   /* SCIP_Real* vals; */
 
    SCIP_Bool total;
    SCIP_VAR* arrow_i_j;
@@ -1116,7 +1165,17 @@ SCIP_RETCODE addPosVariables(
       SCIP_CALL( SCIPchgVarBranchPriority(scip,probdata->posvars[i],posvarpriority)  );
    }
 
+   SCIP_CALL( SCIPcreateConsBasicAlldifferent(scip, &cons, "ad", psd->n, probdata->posvars) ); 
+   SCIP_CALL( SCIPaddCons(scip, cons) );
+   /*SCIP_CALL(  SCIPprintCons(scip, cons, NULL)  );*/
+   SCIP_CALL( SCIPreleaseCons(scip, &cons) );
 
+   SCIP_CALL( SCIPcreateConsBasicBestfororder(scip, &cons, "best", psd, probdata->posvars) );
+   SCIP_CALL( SCIPaddCons(scip, cons) );
+   /*SCIP_CALL(  SCIPprintCons(scip, cons, NULL)  );*/
+   SCIP_CALL( SCIPreleaseCons(scip, &cons) );
+
+   
    /* founders at position 0 if order not total */
 
    if( !total )
@@ -1160,26 +1219,28 @@ SCIP_RETCODE addPosVariables(
       /*SCIP_CALL(  SCIPprintCons(scip, cons, NULL)  );*/
       SCIP_CALL( SCIPreleaseCons(scip, &cons) );
    }
+
+   /* don't need following due to all different constraint */
    
-   /* we have a bound on the sum of all pos variables */
-   SCIP_CALL( SCIPallocBufferArray(scip, &vals, psd->n) );
-   for( i = 0; i < psd->n; ++i )
-      vals[i] = 1;
-   if( total )
-   {
-      lb = maxpos*(maxpos+1)/2;
-      ub = maxpos*(maxpos+1)/2;
-   }
-   else
-   {
-      lb = -SCIPinfinity(scip);
-      ub = maxpos*(maxpos-1)/2 + ((psd->n)-maxpos)*maxpos;
-   }
-   SCIP_CALL( SCIPcreateConsBasicLinear(scip, &cons, "posvarssumcons", psd->n, probdata->posvars, vals, lb, ub) );
-   SCIP_CALL( SCIPaddCons(scip, cons) );
-   /*SCIP_CALL(  SCIPprintCons(scip, cons, NULL)  );*/
-   SCIP_CALL( SCIPreleaseCons(scip, &cons) );
-   SCIPfreeBufferArray(scip, &vals);
+   /* /\* we have a bound on the sum of all pos variables *\/ */
+   /* SCIP_CALL( SCIPallocBufferArray(scip, &vals, psd->n) ); */
+   /* for( i = 0; i < psd->n; ++i ) */
+   /*    vals[i] = 1; */
+   /* if( total ) */
+   /* { */
+   /*    lb = maxpos*(maxpos+1)/2; */
+   /*    ub = maxpos*(maxpos+1)/2; */
+   /* } */
+   /* else */
+   /* { */
+   /*    lb = -SCIPinfinity(scip); */
+   /*    ub = maxpos*(maxpos-1)/2 + ((psd->n)-maxpos)*maxpos; */
+   /* } */
+   /* SCIP_CALL( SCIPcreateConsBasicLinear(scip, &cons, "posvarssumcons", psd->n, probdata->posvars, vals, lb, ub) ); */
+   /* SCIP_CALL( SCIPaddCons(scip, cons) ); */
+   /* /\*SCIP_CALL(  SCIPprintCons(scip, cons, NULL)  );*\/ */
+   /* SCIP_CALL( SCIPreleaseCons(scip, &cons) ); */
+   /* SCIPfreeBufferArray(scip, &vals); */
 
    /* if j is a parent of i then pos(j) - pos(i) <= -1 */
 
@@ -1512,7 +1573,7 @@ SCIP_RETCODE addTotalorderVariables(
    }
 
 
-   SCIPgetBoolParam(scip, "gobnilp/bestparentsfororder", &bestparentsfororder);
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/bestparentsfororder", &bestparentsfororder) );
 
    if( bestparentsfororder )
    {
@@ -1773,10 +1834,18 @@ SCIP_RETCODE addArrowVariables(
    SCIP_Bool arrowconsinitial;
    SCIP_Bool edgeconsinitial;
 
+   SCIP_Bool pricing;
+
    int nvars;
+
+   SCIP_PROBDATA* probdata;
+   int n;
+   int idx;
+   SCIP_Bool arrowarrays;
    
    SCIP_CALL( SCIPgetRealParam(scip, "gobnilp/edge_penalty", &edgepenalty) );
-   SCIP_CALL( SCIPgetIntParam(scip, "gobnilp/arrowfamilylink", &arrowfamilylink) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pricing", &pricing) );
+   SCIP_CALL( SCIPgetIntParam(scip, "gobnilp/arrowfamilylink", &arrowfamilylink) ); 
 
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/arrowvarsinitial", &arrowvarsinitial) );
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/arrowvarsremovable", &arrowvarsremovable) );
@@ -1786,9 +1855,29 @@ SCIP_RETCODE addArrowVariables(
 
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/arrowconsinitial", &arrowconsinitial) );
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/edgeconsinitial", &edgeconsinitial) );
+
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/arrowarrays", &arrowarrays) );
+
+   if( pricing )
+   {
+      arrowfamilylink = 1;
+      arrowarrays = TRUE;
+   }
    
    SCIP_CALL( SCIPallocMemoryArray(scip, &ParentSetsWithArrowFlag, psd->n) );
 
+    /* get problem data */
+   probdata = SCIPgetProbData(scip);
+   assert( probdata != NULL );
+
+   /* set up arrays of constraints and variables for arrows 
+      ( only currently used for pricing ) */
+   n = probdata->psd->n;
+   if( arrowarrays )
+   {
+      SCIP_CALL( SCIPallocBlockMemoryArray(scip, &probdata->arrow_conss, n*n) );
+      SCIP_CALL( SCIPallocBlockMemoryArray(scip, &probdata->arrow_vars, n*n) );
+   }
    /* set up hash table for arrow and edge variables */
    SCIP_CALL( hashtableCreateArrow(scip, psd) );
 
@@ -1826,24 +1915,9 @@ SCIP_RETCODE addArrowVariables(
                exclude[n_exclude++] = psd->PaVars[i][k];
          }
 
-         /* never create arrow variables for arrows which can never occur */
-         if( n_include == 0 )
-            continue;
-
-         /* /\* if arrow only appears in one family, just set arrow variable to be the family variable *\/ */
-         /* if( arrowfamilylink != 1 && n_include == 1 ) */
-         /* { */
-         /*    SCIP_CALL( put_arrow(scip, psd, i, j, include[0]) ); */
-         /*    continue; */
-         /* } */
-
-         /* /\* if arrow missing from only one family, just set arrow variable to be the negation of that family variable *\/ */
-         /* if( arrowfamilylink != 1 && n_exclude == 1 ) */
-         /* { */
-         /*    SCIP_CALL( SCIPgetNegatedVar(scip, exclude[0], &neg_var) ); */
-         /*    SCIP_CALL( put_arrow(scip, psd, i, j, neg_var) ); */
-         /*    continue; */
-         /* } */
+         /* if not pricing, never create arrow variables for arrows which can never occur */
+         if( !pricing && n_include == 0 ) 
+            continue; 
 
          /* create an arrow variable only ( we know j can be a parent of i )*/
          SCIPsnprintf(s, SCIP_MAXSTRLEN, "arrow#%s#%s", psd->nodeNames[i],psd->nodeNames[j]);
@@ -1853,10 +1927,10 @@ SCIP_RETCODE addArrowVariables(
                arrowvarsremovable,   /* removable? */
                NULL, NULL, NULL, NULL, NULL));
          SCIP_CALL( SCIPaddVar(scip, arrow_i_j) );
+         /*SCIP_CALL( SCIPchgVarUbLazy(scip, arrow_i_j, 1.0) ); */
          num_arrows++;
          SCIP_CALL( put_arrow(scip, psd, i, j, arrow_i_j) );
 
-               
          SCIP_CALL( SCIPgetNegatedVar(scip, arrow_i_j, &neg_var) );
 
          include[n_include++] = neg_var;
@@ -1879,12 +1953,16 @@ SCIP_RETCODE addArrowVariables(
                );
             SCIP_CALL( SCIPaddCons(scip, cons) );
             /* SCIP_CALL( SCIPprintCons(scip, cons, NULL) ); */
-            SCIP_CALL( SCIPreleaseCons(scip, &cons) );
+            /* if pricing release constraint later */
+            /* never release, will be used for branching */
+            if( FALSE && !pricing )
+               SCIP_CALL( SCIPreleaseCons(scip, &cons) ); 
          }
-
          
          if( arrowfamilylink == 2 || arrowfamilylink == 4 )
          {
+            assert(!pricing);
+            
             SCIPsnprintf(s, SCIP_MAXSTRLEN, "setpart1#%s#%s", psd->nodeNames[i],psd->nodeNames[j]);
             SCIPcreateConsSetpart(scip, &cons, s, n_include, include,
                arrowconsinitial, /* SCIP_Bool  initial,*/
@@ -1905,6 +1983,7 @@ SCIP_RETCODE addArrowVariables(
 
          if( arrowfamilylink == 3 || arrowfamilylink == 4 )
          {
+            assert(!pricing);
             SCIPsnprintf(s, SCIP_MAXSTRLEN, "setpart2#%s#%s", psd->nodeNames[i],psd->nodeNames[j]);
             SCIPcreateConsSetpart(scip, &cons, s, n_exclude, exclude,
                arrowconsinitial, /* SCIP_Bool   initial,*/
@@ -1923,6 +2002,16 @@ SCIP_RETCODE addArrowVariables(
             /* SCIP_CALL( SCIPprintCons(scip, cons, NULL) ); */
             SCIP_CALL( SCIPreleaseCons(scip, &cons) );
          }
+
+         /* store arrow variable and cons in probdata 
+            (currently only used when pricing) */
+         if( arrowarrays )
+         {
+            idx = n*i +j;
+            assert(idx < n*n);
+            probdata->arrow_vars[idx] = arrow_i_j;
+            probdata->arrow_conss[idx] = cons;
+         }
       }
 
       for( j = 0; j < psd->n; ++j )
@@ -1931,6 +2020,7 @@ SCIP_RETCODE addArrowVariables(
       SCIPfreeMemoryArray(scip, &include);
       SCIPfreeMemoryArray(scip, &exclude);
 
+      
    }
 
    for( i = 0; i < psd->n; ++i )
@@ -2178,9 +2268,9 @@ SCIP_RETCODE addNChildrenVars(
    assert(scip != NULL);
    assert(psd != NULL);
 
-   SCIPgetIntParam(scip, "gobnilp/maxnchildren", &maxnchildren);
-   SCIPgetIntParam(scip, "gobnilp/nchildrenvarpriority", &nchildrenvarpriority);
-   SCIPgetBoolParam(scip, "gobnilp/nchildrenvars", &nchildrenvars);
+   SCIP_CALL( SCIPgetIntParam(scip, "gobnilp/maxnchildren", &maxnchildren) );
+   SCIP_CALL( SCIPgetIntParam(scip, "gobnilp/nchildrenvarpriority", &nchildrenvarpriority) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/nchildrenvars", &nchildrenvars) );
 
    /* just return if no variables to create, and no constraint to post */
    if( !nchildrenvars && maxnchildren == -1 )
@@ -2295,6 +2385,11 @@ SCIP_RETCODE addParentVariables(
                                  SCIP_VARTYPE_BINARY, pavarsinitial, pavarsremovable, NULL, NULL, NULL, NULL, NULL));
 
          SCIP_CALL( SCIPaddVar(scip, psd->PaVars[i][k]) );
+         /* SCIP_CALL( SCIPmarkDoNotMultaggrVar(scip, psd->PaVars[i][k]) ); */
+
+         /* not sure what next line would do, at present */
+         /*SCIP_CALL( SCIPchgVarUbLazy(scip, psd->PaVars[i][k], 1.0) ); */
+
          SCIPdebugMessage("adding variable %s with obj coefficient %f\n", SCIPvarGetName(psd->PaVars[i][k]), SCIPvarGetObj(psd->PaVars[i][k]));
 
 
@@ -2321,13 +2416,25 @@ SCIP_RETCODE addAcyclicityConstraints(
    SCIP_Bool useconsdagcluster;
    SCIP_Bool splitdags;
    SCIP_CONS* cons;
+   SCIP_PROBDATA* probdata;
+   SCIP_Bool pricing;
+   
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/splitdags", &splitdags) );
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/useconsdagcluster", &useconsdagcluster) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pricing", &pricing) );
 
    if( !useconsdagcluster )
       return SCIP_OKAY;
 
+   /* get problem data */
+   probdata = SCIPgetProbData(scip);
+   assert( probdata != NULL );
+
+   if( pricing )
+      splitdags = FALSE;
+   
    /* Only want to check for components if gobnilp/splitdags = TRUE */
+   /* no splitting when pricing! */
    if( splitdags )
    {
       int i;
@@ -2351,9 +2458,12 @@ SCIP_RETCODE addAcyclicityConstraints(
    {
       SCIP_CALL( DC_createCons(scip, &cons, "DagCluster", psd,  TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE) );
       SCIP_CALL( SCIPaddCons(scip, cons) );
-      SCIP_CALL( SCIPreleaseCons(scip, &cons) );
+      if( !pricing )
+         SCIP_CALL( SCIPreleaseCons(scip, &cons) ); 
    }
 
+   probdata->dagcluster_cons = cons;
+   
    SCIPdebugMessage("Dagcluster constraint(s) added.\n");
 
    return SCIP_OKAY;
@@ -2375,19 +2485,63 @@ SCIP_RETCODE addOneParentSetConstraints(
    char s[SCIP_MAXSTRLEN];
    int i;
    SCIP_Bool convexconsinitial;
+   SCIP_Bool pricing;
+   
+   SCIP_PROBDATA* probdata;
+   
+   /* get problem data */
+   probdata = SCIPgetProbData(scip);
+   assert( probdata != NULL );
    
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/convexconsinitial", &convexconsinitial) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pricing", &pricing) );
+
+   SCIP_CALL( SCIPallocBlockMemoryArray(scip, &probdata->one_parent_set, psd->n) );
    
    for( i = 0; i < psd->n; i++ )
    {
-      (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "one_parent_set%d", i);
+      (void) SCIPsnprintf(s, SCIP_MAXSTRLEN, "one_parent_set#%s", psd->nodeNames[i]);
       SCIP_CALL( SCIPcreateConsSetpart(scip, &cons, s, psd->nParentSets[i], psd->PaVars[i], convexconsinitial, TRUE, TRUE, TRUE, TRUE,
             FALSE, FALSE, FALSE, FALSE, FALSE) );
       SCIP_CALL( SCIPaddCons(scip, cons) );
-      SCIP_CALL( SCIPreleaseCons(scip, &cons) );
+      probdata->one_parent_set[i] = cons;
+      if( !pricing )
+         SCIP_CALL( SCIPreleaseCons(scip, &cons) ); 
    }
    return SCIP_OKAY;
 }
+
+/** populates a cluster cut data structure */
+SCIP_RETCODE storeclustercut(
+   SCIP* scip,
+   CLUSTER_CUT** cluster_cut,
+   SCIP_CONS* cons,
+   SCIP_ROW* row,
+   int nelts,
+   int* elts,
+   int k
+)
+{
+   int i;
+
+   assert(scip != NULL);
+   assert(cluster_cut != NULL);
+   assert(elts != NULL);
+   assert(nelts > 1);
+   assert(k > 0);
+   assert( (cons != NULL) == (row == NULL) );
+
+   SCIP_CALL( SCIPallocBlockMemory(scip, cluster_cut ) );
+   (*cluster_cut)->cons = cons;
+   (*cluster_cut)->row = row;
+   (*cluster_cut)->nelts = nelts;
+   (*cluster_cut)->k = k;
+   SCIP_CALL( SCIPallocBlockMemoryArray(scip, &((*cluster_cut)->elts),nelts) );
+   for (i = 0; i < nelts; i++)
+      (*cluster_cut)->elts[i] = elts[i];
+   return SCIP_OKAY;
+}
+
 
 /** Adds the variables and constraints needed for the basic DAG learning problem.
  *
@@ -2403,39 +2557,59 @@ SCIP_RETCODE createBasicModel(
    SCIP_Real** scores
    )
 {
+
+   /********************************************************************/
+
+   /* START standard variables */
+   
    /* Generate family variables */
    SCIP_CALL( addParentVariables(scip, psd, scores) );
 
    /* add arrow and edge variables */
    SCIP_CALL( addArrowVariables(scip, psd) );
 
-   /* add any total order  variables */
-   SCIP_CALL( addAncestorVariables(scip, psd) );
+   /* END standard variables */
+
+   /********************************************************************/
    
-   /* add any total order  variables */
-   SCIP_CALL( addTotalorderVariables(scip, psd) );
+   /* START standard constraints */
+   
+   /* add 'set packing' constraints */
+   SCIP_CALL( SP_add_spc_constraints(scip, psd) );
 
-   /* add any imset variables */
-   SCIP_CALL( addImsetVariables(scip, psd) );
-
-   /* add any posind variables */
-   SCIP_CALL( addPosindVariables(scip, psd) );
-
-   /* add any pos variables */
-   SCIP_CALL( addPosVariables(scip, psd) );
-
-   SCIP_CALL( addNChildrenVars(scip, psd) );
-
-   SCIP_CALL( addPaSizeVariables(scip, psd) );
-
-   /* Add any variables for k best MEC learning */
-   SCIP_CALL( addKBestMECVariables(scip, psd) );
+   /* Add constraint that every node has one parent set */
+   SCIP_CALL( addOneParentSetConstraints(scip, psd) );
 
    /* Generate constraints */
    SCIP_CALL( addAcyclicityConstraints(scip, psd) );
 
-   /* Add constraint that every node has one parent set */
-   SCIP_CALL( addOneParentSetConstraints(scip, psd) );
+   /* END standard constraints */
+
+   /********************************************************************/
+   
+   /* add any total order  variables */
+   SCIP_CALL( addAncestorVariables(scip, psd) );
+   
+   /* add any total order variables, and any relevant constraints */
+   SCIP_CALL( addTotalorderVariables(scip, psd) );
+
+   /* add any imset variables, and any relevant constraints */
+   SCIP_CALL( addImsetVariables(scip, psd) );
+
+   /* add any posind variables, and any relevant constraints */
+   SCIP_CALL( addPosindVariables(scip, psd) );
+
+   /* add any pos variables, and any relevant constraints */
+   SCIP_CALL( addPosVariables(scip, psd) );
+
+   /** add variables which count how many children a node has, and any relevant constraints */
+   SCIP_CALL( addNChildrenVars(scip, psd) );
+
+   /* add any variables for parent set size, and any relevant constraints and branching priorities */
+   SCIP_CALL( addPaSizeVariables(scip, psd) );
+
+   /* Add any variables for k best MEC learning */
+   SCIP_CALL( addKBestMECVariables(scip, psd) );
 
    /* Set maximization */
    SCIP_CALL_ABORT(SCIPsetObjsense(scip, SCIP_OBJSENSE_MAXIMIZE));
@@ -4619,11 +4793,17 @@ SCIP_RETCODE readProblemInNonCIPFormat(
       probdata->posvars = NULL;
       probdata->totalordervars = NULL;
       probdata->ispa = NULL;
-      probdata->isFemale = NULL;
       probdata->pasize = NULL;
       probdata->posind = NULL;
       probdata->imsetvars = NULL;
       probdata->nch = NULL;
+      probdata->isFemale = NULL;
+      probdata->one_parent_set = NULL;
+      probdata->arrow_conss = NULL;
+      probdata->dagcluster_cons = NULL;
+      probdata->nspc_conss = 0;
+      probdata->spc_conss = NULL;
+      probdata->data_etc = NULL;
    }
 
    SCIP_CALL( createBasicModel(scip, psd, scores) );
@@ -4685,9 +4865,13 @@ SCIP_RETCODE BN_readProblem(
    int k;
 
    SCIP_Bool allowmultiaggregation;
-   
+   SCIP_Bool pricing;
+
+   SCIP_PROBDATA* probdata;
+
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/onlyscores", &onlyscores) );
    SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/allowmultiaggregation", &allowmultiaggregation) );
+   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/pricing", &pricing) );
 
    if( onlyscores && strcmp(format, "dat") != 0 )
    {
@@ -4733,7 +4917,21 @@ SCIP_RETCODE BN_readProblem(
    if( !allowmultiaggregation )
       SCIP_CALL( setSpecialProperties(scip, psd) );
 
-   SCIPdebugMessage("Additional constraints, branching priorities and special properties all added.\n");	
+   /* by this point probdata should contain everything that defines the problem instance */
+
+   if( pricing )
+   {
+      /* get problem data */
+      probdata = SCIPgetProbData(scip);
+      assert( probdata != NULL );
+      
+   
+      SCIP_CALL( SCIPpricerFamilyActivate(scip, probdata->psd->n, probdata->one_parent_set,
+            probdata->arrow_conss, probdata->dagcluster_cons, probdata->nspc_conss,
+            probdata->spc_conss) );   
+   }
+   
+   SCIPdebugMessage("Additional constraints, branching priorities, pricer and special properties all added.\n");	
 
    return SCIP_OKAY;
 }

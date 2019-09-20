@@ -36,7 +36,19 @@
 #include "parent_set_data.h"
 #include "property_data.h"
 
+struct data_etc;
+typedef struct data_etc DATA_ETC;
+
+typedef unsigned int VARIABLE;   /**< Variable in the data */
+/* indexing with "int" is supposed to be quicker but empirically
+   it has been shown that "unsigned char" is substantially faster,
+   presumably due to memory savings */
+typedef unsigned int COUNT;      /**< Count, typically of datapoints */
+typedef double SCORE;            /**< A local score. Currently only BDeu, BGe and BIC implemented */
+
+
 extern SCIP_RETCODE SC_addScoringParameters(SCIP* scip);
-extern SCIP_RETCODE SC_readProblemInDataFormat(SCIP* scip, const char* filename, int num_delims, char* delims, SCIP_Bool merge_delims, ParentSetData* psd, SCIP_Real*** scores, PropertyData* prop);
+extern SCIP_RETCODE SC_readProblemInDataFormat(SCIP* scip, const char* filename, int num_delims, char* delims,
+   SCIP_Bool merge_delims, ParentSetData* psd, SCIP_Real*** scores, PropertyData* prop);
 
 #endif

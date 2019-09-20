@@ -62,15 +62,14 @@
 #include "circuit_cuts.h"
 #include "fractional_circuit_cuts.h"
 #include "convex4_cuts.h"
-#include "set_packing_cuts.h"
 #include "subip_cuts.h"
 #include "matroid_cuts.h"
 #include "utils.h"
+#include "probdata_bn.h"
 
 #define DEFAULT_KMAX 1
 #define DEFAULT_KMAX_ROOT 1
 #define DEFAULT_CLUSTERCUTS_ADDTOPOOL TRUE
-#define DEFAULT_PROPAGATESPC TRUE
 #define DEFAULT_USEINCUMBENTCONS FALSE
 #define DEFAULT_SEPASOL_USECONVEX4 FALSE
 #define DEFAULT_SUBIPALWAYS TRUE
@@ -99,6 +98,8 @@
 #define DEFAULT_CONSSEPASOLSUBIPABSGAPLIMIT 0
 
 #define DEFAULT_ROOTGAPSEPALIMIT  0.001
+#define DEFAULT_STORECUTS FALSE
+#define DEFAULT_KNAPSACKONLY FALSE
 
 #define CHECK_WITH_ARROWS TRUE
 
@@ -138,6 +139,11 @@ struct SCIP_ConsData
    ParentSetData* psd;
    SCIP_Bool*** store;                /**< store[i][k][j] = TRUE if j is in kth parent set for i */
    CircuitCutsStorage* ccs;
+
+   int nclustercuts;                  /**< number of cluster cuts generated */
+   int clustercutssize;               /**< size of cluster cuts array */
+   CLUSTER_CUT** clustercuts;         /**< cluster cuts generated */
+
 };
 
 /** constraint handler data */
@@ -146,9 +152,10 @@ struct SCIP_ConshdlrData
    int kmax;                        /**< maximum value of k when searching for k-cluster inequalities (outside the root) */
    int kmaxroot;                    /**< maximum value of k when searching for k-cluster inequalities (in the root) */
    SCIP_Bool clustercuts_addtopool; /**< whether to add cluster cuts to the global cut pool */
-   SCIP_Bool propagatespc;          /**< whether to propagate added set packing constraints */
-   SCIP_Bool nosep_dagcluster;      /**< whether the dagcluster separator failed to find an efficacious cut when last called on LP solution */
-   SCIP_Bool nosepasol_dagcluster;  /**< whether the dagcluster separator failed to find an efficacious cut when last called on an arbitrary primal solution */
+   SCIP_Bool nosep_dagcluster;      /**< whether the dagcluster separator failed to find an efficacious cut when 
+                                       last called on LP solution */
+   SCIP_Bool nosepasol_dagcluster;  /**< whether the dagcluster separator failed to find an efficacious cut when 
+                                       last called on an arbitrary primal solution */
    SCIP_Bool useincumbentcons;      /**< whether to (additionally) look for cluster cuts which are tight for the current incumbent */
    SCIP_Bool sepasol_useconvex4;    /**< whether to search for convex4 cuts when separating an arbitrary primal solution */
    SCIP_Bool subipalways;           /**< whether to always use the subIP to look for cluster cuts */
@@ -185,9 +192,85 @@ struct SCIP_ConshdlrData
    int circuit_size_lim;
    int ground_set_size_lim;
 
-   SCIP_Bool addspc;
-   
+   SCIP_Bool storecuts;        /** if pricing is being used cuts are stored */
+   SCIP_Bool knapsackonly;     /** allow only knapsack representation of cluster cuts (e.g. for pricing) */
+
 };
+
+
+SCIP_RETCODE DC_getclustercuts(
+   SCIP* scip,
+   int* nclustercuts,
+   CLUSTER_CUT*** clustercuts
+   )
+{
+
+   SCIP_CONSHDLR* conshdlr = SCIPfindConshdlr(scip, CONSHDLR_NAME);
+   int num_active_cons = SCIPconshdlrGetNActiveConss(conshdlr);
+   SCIP_CONS** conss = SCIPconshdlrGetConss(conshdlr);
+   int c;
+   SCIP_CONSDATA* consdata;
+
+   SCIPdebugMessage("%d dagcluster constraints\n", num_active_cons);
+   
+   for( c = 0; c < num_active_cons; c++)
+   {
+      consdata = SCIPconsGetData(conss[c]);
+      *nclustercuts = consdata->nclustercuts;
+      *clustercuts = consdata->clustercuts;
+      /* just take first at present */
+      break;
+   }
+   return SCIP_OKAY;
+}
+
+
+SCIP_RETCODE DC_copyclustercut(
+   SCIP* scip,
+   CLUSTER_CUT** cluster_cut,
+   CLUSTER_CUT* orig_cluster_cut
+)
+{
+   int i;
+   
+   SCIP_CALL( SCIPallocBlockMemory(scip, cluster_cut) );
+   (*cluster_cut)->row = orig_cluster_cut->row;
+   (*cluster_cut)->nelts = orig_cluster_cut->nelts;
+   (*cluster_cut)->cons = orig_cluster_cut->cons;
+   (*cluster_cut)->k = orig_cluster_cut->k;
+   SCIP_CALL( SCIPallocBlockMemoryArray(scip, &((*cluster_cut)->elts),orig_cluster_cut->nelts) );
+   for (i = 0; i < orig_cluster_cut->nelts; i++)
+      (*cluster_cut)->elts[i] = orig_cluster_cut->elts[i];
+   return SCIP_OKAY;
+}
+
+/** ensures, that the cluster cuts array can store at least num entries 
+ * (copied from cons_xor)
+ */
+static
+SCIP_RETCODE consdataEnsureClustercutsSize(
+   SCIP*                 scip,               /**< SCIP data structure */
+   SCIP_CONSDATA*        consdata,           /**< constraint data */
+   int                   num                 /**< minimum number of entries to store */
+   )
+{
+   assert(consdata != NULL);
+   assert(consdata->nclustercuts <= consdata->clustercutssize);
+
+   if( num > consdata->clustercutssize )
+   {
+      int newsize;
+
+      newsize = SCIPcalcMemGrowSize(scip, num);
+      SCIP_CALL( SCIPreallocBlockMemoryArray(scip, &consdata->clustercuts, consdata->clustercutssize, newsize) );
+      consdata->clustercutssize = newsize;
+   }
+   assert(num <= consdata->clustercutssize);
+
+   return SCIP_OKAY;
+}
+
+
 
 /** Checks whether a solution is feasible for a given constraint.
  *  Uses arrow variables only to check for acyclicity
@@ -515,6 +598,11 @@ SCIP_RETCODE createConsData(
 
    SCIP_CALL( SCIPallocBlockMemory(scip, &((*consdata)->ccs)) );
    CC_initialise(scip, (*consdata)->ccs, (*consdata)->psd);
+
+   (*consdata)->nclustercuts = 0;
+   (*consdata)->clustercutssize = 0;
+   (*consdata)->clustercuts = NULL;
+
    /* following function not currently used */
    /* FC_initialise(scip, (*consdata)->ccs, (*consdata)->psd); */
 
@@ -720,6 +808,10 @@ SCIP_RETCODE DagClusterSeparate(
    SCIP_Bool found_efficacious;
 
    SCIP_CONSHDLRDATA* conshdlrdata;
+
+   CLUSTER_CUT** cluster_cuts = NULL;
+   int i;
+   
    conshdlrdata = SCIPconshdlrGetData(conshdlr);
 
    (*nGen) = 0;
@@ -731,10 +823,26 @@ SCIP_RETCODE DagClusterSeparate(
 
    num_gen = 0;
    found_efficacious = FALSE;
-   SCIP_CALL( CC_findCuts(scip, conshdlr, consdata->psd, sol, consdata->ccs, &num_gen, forcecuts, &found_efficacious, cutoff) );
+
+   SCIP_CALL( CC_findCuts(scip, conshdlr, consdata->psd, sol, consdata->ccs, &num_gen,
+         forcecuts, &found_efficacious, cutoff, &cluster_cuts, conshdlrdata->storecuts, conshdlrdata->knapsackonly) );
+
    if( *cutoff )
       return SCIP_OKAY;
    (*nGen) += num_gen;
+
+   if( conshdlrdata->storecuts )
+   {
+      /* add found cluster 'circuit', cuts to constraint data */
+      SCIP_CALL( consdataEnsureClustercutsSize(scip, consdata, consdata->nclustercuts + num_gen) );
+      /* printf("Adding %d circuit cluster cuts\n", num_gen); */
+      for(i = 0; i < num_gen; i++)
+         consdata->clustercuts[consdata->nclustercuts++] = cluster_cuts[i];
+   }
+
+   if( cluster_cuts != NULL )
+      SCIPfreeBlockMemoryArray(scip, &cluster_cuts, num_gen);
+   
    (*found_efficacious_ptr) |= found_efficacious;
 
    if( shouldTryFractionalCircuitCuts(conshdlrdata, *nGen) )
@@ -766,11 +874,28 @@ SCIP_RETCODE DagClusterSeparate(
       num_gen = 0;
       found_efficacious = FALSE;
 
-      SCIP_CALL( IP_findCuts(scip, consdata->psd, solinfo, sol, &num_gen, k_lb, k_ub, conshdlr, addtopool, forcecuts, &found_efficacious, limits_time, limits_gap, limits_absgap, incumbent_cons, NULL, 0, NULL, 0, FALSE, conshdlrdata->matroidpaircuts, conshdlrdata->matroidpaircutslimit, conshdlrdata->matroidpairmaxcuts, cutoff) );
+      SCIP_CALL( IP_findCuts(scip, consdata->psd, solinfo, sol, &num_gen, k_lb, k_ub,
+            conshdlr, addtopool, forcecuts, &found_efficacious, limits_time, limits_gap,
+            limits_absgap, incumbent_cons, NULL, 0, NULL, 0, FALSE,
+            conshdlrdata->matroidpaircuts, conshdlrdata->matroidpaircutslimit, conshdlrdata->matroidpairmaxcuts,
+            cutoff, &cluster_cuts, conshdlrdata->storecuts, conshdlrdata->knapsackonly) );
       if( *cutoff )
          return SCIP_OKAY;
       (*nGen) += num_gen;
       (*found_efficacious_ptr) |= found_efficacious;
+
+      if( conshdlrdata->storecuts )
+      {
+         /* add found cluster cuts to constraint data */
+         SCIP_CALL( consdataEnsureClustercutsSize(scip, consdata, consdata->nclustercuts + num_gen) );
+         /* printf("Adding %d cluster cuts\n", num_gen); */
+         for(i = 0; i < num_gen; i++)
+            consdata->clustercuts[consdata->nclustercuts++] = cluster_cuts[i];
+      }
+
+      if( cluster_cuts != NULL)
+         SCIPfreeBlockMemoryArray(scip, &cluster_cuts, num_gen);
+      
    }
 
    return SCIP_OKAY;
@@ -863,47 +988,8 @@ SCIP_DECL_CONSCOPY(consCopyDagcluster)
 
 /* Initialisation Callbacks */
 /** presolving initialization method of constraint handler (called when presolving is about to begin) */
-static
-SCIP_DECL_CONSINITPRE(consInitpreDagcluster)
-{
+#define consInitpreDagcluster NULL
 
-   int c;
-
-   SCIP_CONS* cons;
-   SCIP_CONSDATA* consdata;
-
-   SCIP_CONSHDLRDATA* conshdlrdata;
-
-   assert(scip != NULL);
-   assert(conshdlr != NULL);
-   assert(strcmp(SCIPconshdlrGetName(conshdlr), CONSHDLR_NAME) == 0);
-
-   conshdlrdata = SCIPconshdlrGetData(conshdlr);
-   assert(conshdlrdata != NULL);
-
-   if( !(conshdlrdata->addspc) )
-      return SCIP_OKAY;
-
-   SCIPdebugMessage("Adding set packing constraints in dagcluster constraint handler initialisation.\n");
-
-   for( c = 0; c < nconss; ++c )
-   {
-
-      cons = conss[c];
-      assert(cons != NULL);
-
-      consdata = SCIPconsGetData(cons);
-
-      /* now add in 'SPC' constraints */
-
-      SCIP_CALL( SP_add_spc_constraints(scip, consdata->psd, consdata->store, conshdlrdata->propagatespc) ); 
-
-   }
-
-   SCIPdebugMessage("Added all set packing constraints in dagcluster constraint handler initialisation.\n");
-
-   return SCIP_OKAY;
-}
 /** LP initialization method of constraint handler */
 static
 SCIP_DECL_CONSINITLP(consInitlpDagcluster)
@@ -1012,7 +1098,8 @@ SCIP_DECL_CONSDELETE(consDeleteDagcluster)
 
    int i;
    int k;
-
+   SCIP_CONSHDLRDATA* conshdlrdata;
+   
    assert(scip != NULL);
    assert(conshdlr != NULL);
    assert(strcmp(SCIPconshdlrGetName(conshdlr), CONSHDLR_NAME) == 0);
@@ -1022,6 +1109,10 @@ SCIP_DECL_CONSDELETE(consDeleteDagcluster)
 
    SCIPdebugMessage("deleting DAG cluster constraint <%s>.\n", SCIPconsGetName(cons));
 
+   conshdlrdata = SCIPconshdlrGetData(conshdlr);
+   assert(conshdlrdata != NULL);
+
+   
    for( i = 0; i < (*consdata)->psd->n; ++i )
    {
       for( k = 0;  k < (*consdata)->psd->nParentSets[i]; ++k )
@@ -1036,6 +1127,16 @@ SCIP_DECL_CONSDELETE(consDeleteDagcluster)
 
    SCIP_CALL( PS_deallocateParentSetData(scip, &((*consdata)->psd), FALSE) );
 
+   if( conshdlrdata->storecuts )
+   {
+      for( i = 0; i < (*consdata)->nclustercuts; ++i )
+      {
+         SCIPfreeBlockMemoryArray(scip, &(((*consdata)->clustercuts)[i]->elts), ((*consdata)->clustercuts)[i]->nelts) ;
+         SCIPfreeBlockMemory(scip, &(((*consdata)->clustercuts)[i])) ;
+      }
+      if( (*consdata)->clustercuts != NULL )
+         SCIPfreeBlockMemoryArray(scip, &((*consdata)->clustercuts), (*consdata)->clustercutssize);
+   }
    SCIPfreeBlockMemory(scip, consdata);
 
    return SCIP_OKAY;
@@ -1361,111 +1462,6 @@ SCIP_DECL_CONSSEPASOL(consSepasolDagcluster)
 static
 SCIP_DECL_CONSENFOLP(consEnfolpDagcluster)
 {
-   int c;
-   SCIP_CONSDATA* consdata;
-   SCIP_CONS* cons;
-
-   SCIP_Bool ancestralbranching;
-
-   SCIP_CALL( SCIPgetBoolParam(scip, "gobnilp/ancestralbranching", &ancestralbranching) );
-   
-   if( ancestralbranching )
-   {
-      for( c = 0; c < nconss; ++c )
-      {
-         int n;
-         ParentSetData* psd;
-         int i;
-         int k;
-         int l;
-         int* selected;
-         SCIP_Bool* ancestral;
-         SCIP_Bool made_progress;
-         SCIP_Bool all_ancestral;
-
-         cons = conss[c];
-         assert(cons != NULL);
-         consdata = SCIPconsGetData(cons);
-         assert(consdata != NULL);
-         psd = consdata->psd;
-         n = psd->n;
-
-         SCIP_CALL( SCIPallocBufferArray(scip, &ancestral, n) );
-         SCIP_CALL( SCIPallocBufferArray(scip, &selected, n) );
-
-         /* find any selected parent sets and mark vertices with selected empty parent sets as ancestral */
-         made_progress = FALSE;
-         for( i = 0; i < n; ++i )
-         {
-            ancestral[i] = FALSE;
-            selected[i] = -1;
-            for( k = 0 ; k < psd->nParentSets[i]; ++k )
-            {
-               if( SCIPvarGetLbLocal(psd->PaVars[i][k]) > 0.5 )
-               {
-                  if( psd->nParents[i][k] == 0 )
-                  {
-                     ancestral[i] = TRUE;
-                     made_progress = TRUE;
-                  }
-                  selected[i] = k;
-                  break;
-               }
-            }
-         }
-      
-         while( made_progress )
-         {
-            made_progress = FALSE;
-            for( i = 0; i < n; ++i )
-            {
-            
-               k = selected[i];
-               if( k == -1 || ancestral[i] )
-                  continue;
-
-               all_ancestral = TRUE;
-               for(l = 0; l < psd->nParents[i][k]; ++l )
-               {
-                  if( !ancestral[psd->ParentSets[i][k][l]] )
-                  {
-                     all_ancestral = FALSE;
-                     break;
-                  }
-               }
-
-               if( all_ancestral )
-               {
-                  ancestral[i] = TRUE;
-                  made_progress = TRUE;
-               }
-            }
-         }
-   
-         /* update branching priorities of (unfixed) family variables */
-         for( i = 0; i < n; ++i )
-         {
-            if( selected[i] != -1 )
-               continue;
-         
-            for( k = 0 ; k < psd->nParentSets[i]; ++k )
-            {
-               all_ancestral = TRUE;
-               for(l = 0; l < psd->nParents[i][k]; ++l )
-               {
-                  if( !ancestral[psd->ParentSets[i][k][l]] )
-                  {
-                     all_ancestral = FALSE;
-                     break;
-                  }
-               }
-               SCIP_CALL( SCIPchgVarBranchPriority(scip, psd->PaVars[i][k], all_ancestral ? 100 : -100 ) );
-            }
-         }
-         SCIPfreeBufferArray(scip, &selected);
-         SCIPfreeBufferArray(scip, &ancestral);
-      }
-   }
 
    if( areFeasible(scip, conss, nconss, NULL) )
    {
@@ -1745,10 +1741,6 @@ SCIP_RETCODE DC_includeConshdlr(SCIP* scip)
                               "whether to add cluster cuts to the global cut pool",
                               &conshdlrdata->clustercuts_addtopool, FALSE, DEFAULT_CLUSTERCUTS_ADDTOPOOL, NULL, NULL));
 
-   SCIP_CALL(SCIPaddBoolParam(scip,
-                              "constraints/"CONSHDLR_NAME"/propagatespc",
-                              "whether to propagate added set packing constraints",
-                              &conshdlrdata->propagatespc, FALSE, DEFAULT_PROPAGATESPC, NULL, NULL));
 
    conshdlrdata->nosep_dagcluster = FALSE;
    conshdlrdata->nosepasol_dagcluster = FALSE;
@@ -1875,10 +1867,16 @@ SCIP_RETCODE DC_includeConshdlr(SCIP* scip)
          "limit on size of ground set when searching for matroid cuts",
          &conshdlrdata->ground_set_size_lim, FALSE, DEFAULT_GROUND_SET_SIZE_LIM, 2, INT_MAX, NULL, NULL));
 
+
    SCIP_CALL(SCIPaddBoolParam(scip,
-         "constraints/"CONSHDLR_NAME"/addspc",
-         "whether to add 'set packing' constraints",
-         &conshdlrdata->addspc, TRUE, DEFAULT_ADDSPC, NULL, NULL));
+         "constraints/"CONSHDLR_NAME"/storecuts",
+         "whether to store found cuts (for e.g. pricing)",
+         &conshdlrdata->storecuts, FALSE, DEFAULT_STORECUTS, NULL, NULL));
+
+   SCIP_CALL(SCIPaddBoolParam(scip,
+         "constraints/"CONSHDLR_NAME"/knapsackonly",
+         "whether to only allow knapsack representation for cluster cuts (for e.g. pricing)",
+         &conshdlrdata->knapsackonly, FALSE, DEFAULT_KNAPSACKONLY, NULL, NULL));
 
    
    SCIP_CALL( CC_addParams(scip) );
@@ -1937,6 +1935,7 @@ SCIP_RETCODE DC_createCons(
    /* create constraint */
    SCIP_CALL( SCIPcreateCons(scip, cons, name, conshdlr, consdata, initial, separate, enforce, check, propagate, local, modifiable, dynamic, removable, stickingatnode) );
 
+   
    return SCIP_OKAY;
 }
 

@@ -37,6 +37,8 @@
 #include "vector.h"
 #include "vectorlist.h"
 #include "parent_set_data.h"
+#include "cons_dagcluster.h"
+
 
 /** A collection of storage items that can be allocated just once per constraint to save time. */
 typedef struct
@@ -66,6 +68,8 @@ typedef struct
 extern SCIP_RETCODE CC_addParams(SCIP* scip);
 extern SCIP_RETCODE CC_initialise(SCIP* scip, CircuitCutsStorage* ccs, ParentSetData* data);
 extern SCIP_RETCODE CC_finalise(SCIP* scip, CircuitCutsStorage* ccs, int n);
-extern SCIP_RETCODE CC_findCuts(SCIP* scip, SCIP_CONSHDLR* conshdlr, ParentSetData* psd, SCIP_SOL* sol, CircuitCutsStorage* ccs, int* nGen, SCIP_Bool forcecuts, SCIP_Bool* found_efficacious_ptr, SCIP_Bool* cutoff);
+extern SCIP_RETCODE CC_findCuts(SCIP* scip, SCIP_CONSHDLR* conshdlr, ParentSetData* psd, SCIP_SOL* sol,
+   CircuitCutsStorage* ccs, int* nGen, SCIP_Bool forcecuts, SCIP_Bool* found_efficacious_ptr,
+   SCIP_Bool* cutoff, CLUSTER_CUT*** cluster_cuts, SCIP_Bool storecuts, SCIP_Bool knapsackonly);
 
 #endif

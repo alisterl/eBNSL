@@ -40,6 +40,381 @@
 #include "scip/scipdefplugins.h"
 #include <scip/cons_countsols.h>
 
+struct dag
+{
+   int n;                      /**< Number of vertices */
+   int* nParents;              /**< Number of parents for each vertex */
+   int** ParentSets;           /**< `ParentSets[i][l]` is the lth parent of i */
+   SCIP_Bool** pdag_directed;  /**< When representing an essential graph `pdag_directed[i][l]` is TRUE 
+                                  iff the arrow from the lth parent of i to i is directed
+                                  in the essential graph for the dag, i.e. if it has the same orientation in each Markov
+                                  equivalent graph */
+};
+typedef struct dag DAG; /**< Represents a dag */
+
+/** Deletes a dag
+ */
+static
+void deletedag(
+   SCIP* scip, /**< SCIP instance  */
+   DAG* dag    /**< dag to delete */ 
+   )
+{
+   int i;
+   for( i = 0; i < dag->n; ++i )
+   {
+      SCIPfreeMemoryArray(scip, &(dag->ParentSets[i]) );
+      SCIPfreeMemoryArray(scip, &(dag->pdag_directed[i]) );
+   }
+   SCIPfreeMemoryArray(scip, &(dag->nParents) );
+   SCIPfreeMemoryArray(scip, &(dag->ParentSets) );
+   SCIPfreeMemoryArray(scip, &(dag->pdag_directed) );
+}
+
+
+static
+SCIP_Bool adjacent(
+   DAG* dag,               /**< the dag */
+   int i,                  /**< first vertex */
+   int j,                  /**< second vertex */
+   SCIP_Bool undirected    /**< whether only undirected (in PDAG) adjacencies count */
+   )
+{
+    int l;
+   
+   assert(dag != NULL);
+   assert(dag->nParents != NULL);
+   assert(dag->ParentSets != NULL);
+   assert(dag->pdag_directed != NULL);
+   assert(i > -1);
+   assert(j > -1);
+   assert(i < dag->n);
+   assert(j < dag->n);
+
+   for( l = 0; l < dag->nParents[j]; l++ )
+      if( dag->ParentSets[j][l] == i && !(undirected && (dag->pdag_directed[j][l])) )
+         return TRUE;
+
+   for( l = 0; l < dag->nParents[i]; l++ )
+      if( dag->ParentSets[i][l] == j && !(undirected && dag->pdag_directed[i][l]) )
+         return TRUE;
+
+   return FALSE;
+}
+
+
+/** Returns the parent index of i if it is a parent of j, else -1
+ * @return the parent index of i if it is a parent of j, else -1
+ */
+static
+int parentindex(
+   DAG* dag,    /**< the dag */
+   int i,       /**< from vertex */
+   int j        /**< to vertex */
+   )
+{
+
+   int l;
+   
+   assert(dag != NULL);
+   assert(dag->nParents != NULL);
+   assert(dag->ParentSets != NULL);
+   assert(dag->pdag_directed != NULL);
+   assert(i > -1);
+   assert(j > -1);
+   assert(i < dag->n);
+   assert(j < dag->n);
+
+   for( l = 0; l < dag->nParents[j]; l++ )
+      if( dag->ParentSets[j][l] == i )
+         return l;
+
+   return -1;
+   
+}
+
+
+/** Find the index for x for use in R3 
+ * @return The index for x or -1 if there is no x
+ */
+static
+int findx(
+   DAG* dag,    /**< the dag */
+   int z,       /**< child */
+   int l1,      /**< parent index */
+   int l2,      /**< parent index */
+   int l3       /**< parent index */
+   )
+{
+
+   int count = 0;
+   int res;
+   int nonres[3];
+   int pa;
+   int x;
+   int ls[3];
+   int i;
+   int l;
+
+   assert(dag != NULL);
+   assert(dag->nParents != NULL);
+   assert(dag->ParentSets != NULL);
+   assert(dag->pdag_directed != NULL);
+   assert(z > -1);
+   assert(z < dag->n);
+   assert(dag->nParents[z] < dag->n);
+   assert(l1 > -1);
+   assert(l2 > -1);
+   assert(l3 > -1);
+   assert(l1 < dag->nParents[z]);
+   assert(l2 < dag->nParents[z]);
+   assert(l3 < dag->nParents[z]);
+   assert(l1 != l2);
+   assert(l1 != l3);
+   assert(l2 != l3);
+   
+   ls[0] = l1;
+   ls[1] = l2;
+   ls[2] = l3;
+
+   for(i = 0; i < 3; i++)
+   {
+      l = ls[i];
+      pa = dag->ParentSets[z][l];
+
+      assert(pa > -1);
+      assert(pa < dag->n);
+      
+      if( dag->pdag_directed[z][l] )
+         nonres[count++] = pa;
+      else
+      {
+         x = pa;
+         res = l;
+      }
+   }
+
+   /* y1 = nonres[0], y2 = nonres[1] 
+      for (x->z) need in PDAG:
+      x-y1, x-y2,
+      x-z, y1->z, y2->z, and no edge between y1 and y2
+   */
+   if( count == 2 && /* x-z, y1->z, y2->z */
+      adjacent(dag,nonres[0],x,TRUE) && /* x-y1 */
+      adjacent(dag,nonres[1],x,TRUE) && /* x-y2 */
+      !adjacent(dag,nonres[0],nonres[1],FALSE) /* no edge between y1 and y2 */
+      )
+      return res;
+   else
+      return -1;
+}
+
+         
+/** Given a DAG use orientation rules R1, R2 and R3 (from Koller and Friedman p.89) to determine all edges
+ * that always have the same orientation in any other Markov equivalent DAG. This function should be called after ::fiximmoralities 
+ * has been called, since it assumes that immoralties have previously been used to orient edges.
+ *
+ * This function only affects the dag::pdag_directed member of the DAG 
+ * data structure. Upon return `dag->pdag_directed[i][l]==TRUE` iff there is an arrow from lth parent of i 
+ * to i in every Markov equivalent DAG.
+ */
+static
+void applyorientiationrules(
+   DAG* dag  /**< DAG to find PDAG orientations for */
+   )
+{
+   int x;
+   int y;
+   int z;
+   int l1;
+   int l2;
+   int l3;
+   SCIP_Bool progress;
+
+   assert(dag != NULL);
+   assert(dag->nParents != NULL);
+   assert(dag->ParentSets != NULL);
+   assert(dag->pdag_directed != NULL);
+
+
+
+   progress = TRUE;
+   while( progress )
+   {
+      progress = FALSE;
+
+      /* Use same letters as Koller and Friedman */
+      
+      for( z = 0; z < dag->n; ++z )
+      {
+         for( l1 = 0; l1 < dag->nParents[z]; l1++ )
+         {
+            y = dag->ParentSets[z][l1];
+            for( l2 = 0; l2 < dag->nParents[y]; l2++ )
+            {
+               if( !(dag->pdag_directed[y][l2]) )
+                  continue;
+               
+               x = dag->ParentSets[y][l2];
+
+               /* have x->y->z in dag 
+                  and x->y in pdag */
+
+               l3 = parentindex(dag,x,z);
+               
+               if( l3 == -1 )
+               {
+                  /* no edge between x and z */
+                  if( !(dag->pdag_directed[z][l1]) )
+                  {
+                     /* apply R1, edge from y to z is 'forced' */
+                     printf("Using R1 with x=%d, y=%d, z=%d to add arrow %d->%d\n",
+                        x,y,z,y,z);
+                     dag->pdag_directed[z][l1] = TRUE;
+                     progress = TRUE;
+                  }
+               }
+               else
+               {
+                  /* edge between x and z and y->z in pdag */
+                  if( dag->pdag_directed[z][l1] && !(dag->pdag_directed[z][l3])  )
+                  {
+                     /* apply R2, edge from x to z is 'forced' */
+                     printf("Using R2 with x=%d, y=%d, z=%d to add arrow %d->%d\n",
+                        x,y,z,x,z);
+                     dag->pdag_directed[z][l3] = TRUE;
+                     progress = TRUE;
+                  }
+               }
+            }
+         }
+
+         /* do R3 separately, need at least 3 parents */
+         if( dag->nParents[z] > 2 )
+         {
+            for( l1 = 0; l1 < dag->nParents[z]; l1++ )
+            {
+               for( l2 = l1+1; l2 < dag->nParents[z]; l2++ )
+               {
+                  for( l3 = l2+1; l3 < dag->nParents[z]; l3++ )
+                  {
+                     int l;
+                     /* l is index of 'x' (if not == -1) */
+                     l = findx(dag,z,l1,l2,l3);
+                     if( l != -1 )
+                     {
+                        printf("Using R3 to add arrow %d->%d\n", dag->ParentSets[z][l], z);
+                        dag->pdag_directed[z][l] = TRUE;
+                        progress = TRUE;
+                     }
+                  }
+               }
+            }
+         }
+      }
+   }
+}
+
+/** Given a DAG use immoralities (v-structures) to determine some of the edges
+ * that always have the same orientation in any other Markov equivalent DAG.
+ *
+ * This function only affects the dag::pdag_directed member of the DAG 
+ * data structure. Upon return `dag->pdag_directed[i][l]==TRUE` iff the lth parent of i participates in an immorality
+ * where i is the child. Any prior values for `dag->pdag_directed[i][l]` are ignored.
+ */
+static
+void fiximmoralities(
+   DAG* dag  /**< DAG to find PDAG orientations for */
+   )
+{
+   int i;
+   int l, l1, l2;
+   int pa1;
+   int pa2;
+   SCIP_Bool marriage;
+
+   assert(dag != NULL);
+   assert(dag->nParents != NULL);
+   assert(dag->ParentSets != NULL);
+   assert(dag->pdag_directed != NULL);
+   
+   for( i = 0; i < dag->n; ++i )
+   {
+      /* initially unpdag_directed edges */
+      for( l1 = 0; l1 < dag->nParents[i]; l1++ )
+         dag->pdag_directed[i][l1] = FALSE;         
+         
+      for( l1 = 0; l1 < dag->nParents[i]; l1++ )
+      {
+         pa1 = dag->ParentSets[i][l1];
+         for( l2 = l1+1; l2 < dag->nParents[i]; l2++ )
+         {
+            pa2 = dag->ParentSets[i][l2];
+            marriage = FALSE;
+            for( l = 0; l < dag->nParents[pa1] && !marriage; l++ )
+               marriage = ( dag->ParentSets[pa1][l] == pa2 );
+            for( l = 0; l < dag->nParents[pa2] && !marriage; l++ )
+               marriage = ( dag->ParentSets[pa2][l] == pa1 );
+
+            if( !marriage )
+            {
+               printf("Using immorality to add arrows %d->%d and %d->%d\n",
+                  dag->ParentSets[i][l1], i, dag->ParentSets[i][l2], i);
+               dag->pdag_directed[i][l1] = TRUE;
+               dag->pdag_directed[i][l2] = TRUE;         
+            }
+         }
+      }
+   }
+}
+
+/** Create a dag from a parent set data structure
+ *
+ * @return SCIP_OKAY if all OK, else an error return code
+ */
+static
+SCIP_RETCODE makedag(
+   SCIP* scip,           /**< SCIP instance */
+   ParentSetData* psd,   /**< Parent set data structure */
+   SCIP_Bool** selected, /**< `selected[i][k]==TRUE` iff the kth parent set for i in psd is the one for dag */
+   DAG* dag              /**< dag to create */
+   )
+{
+   int i;
+   int k;
+   int l;
+
+   assert(scip != NULL);
+   assert(psd != NULL);
+   assert(selected != NULL);
+   assert(dag != NULL);
+   
+   dag->n = psd->n;
+   SCIP_CALL( SCIPallocMemoryArray(scip, &(dag->nParents), dag->n) );
+   SCIP_CALL( SCIPallocMemoryArray(scip, &(dag->ParentSets), dag->n) );
+   SCIP_CALL( SCIPallocMemoryArray(scip, &(dag->pdag_directed), dag->n) );
+   for( i = 0; i < psd->n; ++i )
+   {
+      for( k = 0; k < psd->nParentSets[i]; ++k )
+      {
+         if( selected[i][k] )
+         {
+            dag->nParents[i] = psd->nParents[i][k];
+            SCIP_CALL( SCIPallocMemoryArray(scip, &(dag->ParentSets[i]), dag->nParents[i]) );
+            SCIP_CALL( SCIPallocMemoryArray(scip, &(dag->pdag_directed[i]), dag->nParents[i]) );
+            for( l = 0; l < dag->nParents[i]; ++l )
+            {
+               dag->ParentSets[i][l] = psd->ParentSets[i][k][l];
+               dag->pdag_directed[i][l] = TRUE;
+            }
+            /* just take first 'selected' parent set, there should be only one */
+            break;
+         }
+      }
+   }
+   return SCIP_OKAY;
+}
+
 /** Adds the parameters to SCIP related to outputing results.
  *
  *  These parameters consist of all those of the form @c gobnilp/outputfile/\<param\> .
@@ -147,6 +522,13 @@ SCIP_RETCODE IO_addOutputParameters(SCIP* scip)
                                ""
                               ));
 
+   SCIP_CALL(UT_addStringParam(scip,
+                               "gobnilp/outputfile/pdag",
+                               "file which PDAG essential graph should be output (stdout for standard out, empty string for nowhere)",
+                               ""
+                              ));
+
+   
    SCIP_CALL(UT_addStringParam(scip,
          "gobnilp/outputfile/pss",
          "file to which parent set scores should be output (stdout for standard out, empty string for nowhere)",
@@ -417,6 +799,60 @@ static SCIP_RETCODE printSCIPSolution(SCIP* scip)
 }
 
 
+/** Prints the PDAG essential graph of the solution in dot format.
+ *
+ *  @param scip The SCIP instance to which the solution belongs.
+ *  @param psd The problem data used by the solution.
+ *  @param selected Whether each of the variables is selected in the solution.
+ *  @param stream Where to print the solution.
+ *  @return SCIP_OKAY if the solution was printed correctly or an appropriate error message otherwise.
+ */
+static SCIP_RETCODE printSolutionPDAGFormat(
+   SCIP* scip,
+   ParentSetData* psd,
+   SCIP_Bool** selected,
+   FILE* stream
+   )
+{
+   DAG dag;
+   int i;
+   int l;
+   /* const char* undirected = "-"; */
+   /* const char* directed = "<-";  */
+   
+   SCIP_CALL( makedag(scip, psd, selected, &dag) );
+   fiximmoralities(&dag);
+   applyorientiationrules(&dag);
+
+   fprintf(stream, "digraph {\n");
+   for( i = 0; i < psd->n; ++i )
+      fprintf(stream, "   %s;\n", psd->nodeNames[i]);
+   for( i = 0; i < psd->n; ++i )
+   {
+      for( l = 0; l < dag.nParents[i]; l++ )
+      {
+         fprintf(stream, "   %s -> %s", psd->nodeNames[dag.ParentSets[i][l]], psd->nodeNames[i]);
+         if( !(dag.pdag_directed[i][l]) )
+            fprintf(stream, " [arrowhead=none]");
+         fprintf(stream, ";\n");
+      }
+   }
+   fprintf(stream, "}\n");
+
+   /* fprintf(stream, "Vertices:\n"); */
+   /* for( i = 0; i < dag.n; ++i ) */
+   /*    fprintf(stream, "%s\n", psd->nodeNames[i]); */
+   /* fprintf(stream, "\nEdges:\n"); */
+   /* for( i = 0; i < dag.n; ++i ) */
+   /*    for( l = 0; l < dag.nParents[i]; ++l ) */
+   /*       fprintf(stream, "%s%s%s\n", psd->nodeNames[i], */
+   /*          (dag.pdag_directed[i][l] ? directed : undirected), */
+   /*          psd->nodeNames[dag.ParentSets[i][l]] ); */
+
+   deletedag(scip, &dag);
+   return SCIP_OKAY;
+}
+
 /** Prints the Markov equivalance class of the solution.
  *
  *  @param scip The SCIP instance to which the solution belongs.
@@ -536,6 +972,9 @@ static SCIP_RETCODE printToFile(SCIP* scip, ParentSetData* psd, SCIP_Real** Scor
       printSolutionAdjacencyMatrixFormat(scip, psd, Scores, selected, total_score, file);
    else if( strcmp(format, "mec") == 0 )
       printSolutionMECFormat(scip, psd, Scores, selected, total_score, file);
+   else if( strcmp(format, "pdag") == 0 )
+      printSolutionPDAGFormat(scip, psd, selected, file);
+
    else
       printSolutionBNFormat(scip, psd, Scores, selected, total_score, file);
 
@@ -879,6 +1318,7 @@ SCIP_RETCODE IO_doIterativePrint(
    char* satfile;
    char* matfile;
    char* mecfile;
+   char* pdagfile;
 
    char* run_solfile;
    char* run_dotfile;
@@ -886,6 +1326,7 @@ SCIP_RETCODE IO_doIterativePrint(
    char* run_satfile;
    char* run_matfile;
    char* run_mecfile;
+   char* run_pdagfile;
 
 
    int avgoutputoffset;
@@ -912,6 +1353,7 @@ SCIP_RETCODE IO_doIterativePrint(
    SCIPgetStringParam(scip, "gobnilp/outputfile/scoreandtime", &satfile);
    SCIPgetStringParam(scip, "gobnilp/outputfile/adjacencymatrix", &matfile);
    SCIPgetStringParam(scip, "gobnilp/outputfile/mec", &mecfile);
+   SCIPgetStringParam(scip, "gobnilp/outputfile/pdag", &pdagfile);
 
    SCIPgetIntParam(scip, "gobnilp/avgoutputoffset", &avgoutputoffset);
    SCIPgetIntParam(scip, "gobnilp/avgoutputstep", &avgoutputstep);
@@ -935,6 +1377,7 @@ SCIP_RETCODE IO_doIterativePrint(
    run_satfile = createFilename(satfile, SCIPgetProbName(scip), nbns, run);
    run_matfile = createFilename(matfile, SCIPgetProbName(scip), nbns, run);
    run_mecfile = createFilename(mecfile, SCIPgetProbName(scip), nbns, run);
+   run_pdagfile = createFilename(pdagfile, SCIPgetProbName(scip), nbns, run);
 
    SCIP_CALL( printSolution(scip, psd, run_solfile, (char*)"legacy") );
    SCIP_CALL( printSolution(scip, psd, run_dotfile, (char*)"dot") );
@@ -942,6 +1385,7 @@ SCIP_RETCODE IO_doIterativePrint(
    SCIP_CALL( printSolution(scip, psd, run_satfile, (char*)"scoreandtime") );
    SCIP_CALL( printSolution(scip, psd, run_matfile, (char*)"adjacencymatrix") );
    SCIP_CALL( printSolution(scip, psd, run_mecfile, (char*)"mec") );
+   SCIP_CALL( printSolution(scip, psd, run_pdagfile, (char*)"pdag") );
 
    free(run_solfile);
    free(run_dotfile);
@@ -949,6 +1393,7 @@ SCIP_RETCODE IO_doIterativePrint(
    free(run_satfile);
    free(run_matfile);
    free(run_mecfile);
+   free(run_pdagfile);
 
    if( avgoutputoffset > -1 && (run + 1) >= avgoutputoffset )
    {
@@ -975,7 +1420,7 @@ SCIP_RETCODE IO_doIterativePrint(
       }
    }
 
-   if( strcmp(solfile, "") != 0 || strcmp(dotfile, "") != 0 || strcmp(pedfile, "") != 0 || strcmp(satfile, "") != 0 || strcmp(matfile, "") != 0 || strcmp(mecfile, "") != 0 )
+   if( strcmp(solfile, "") != 0 || strcmp(dotfile, "") != 0 || strcmp(pedfile, "") != 0 || strcmp(satfile, "") != 0 || strcmp(matfile, "") != 0 || strcmp(mecfile, "") != 0 || strcmp(pdagfile, "") != 0 )
       SCIPinfoMessage(scip, NULL, "\n");
    else if((avgoutputoffset > -1 && (run + 1) >= avgoutputoffset) && ((run - avgoutputoffset + 1) % avgoutputstep == 0) && (
               strcmp(avgsolfile, "") != 0 || strcmp(avgdotfile, "") != 0 || strcmp(avgpedfile, "") != 0 || strcmp(avgsatfile, "") != 0 || strcmp(avgmatfile, "") != 0))

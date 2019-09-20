@@ -32,8 +32,9 @@
  *  (possibly partially fractional) solution of the linear relaxation, and
  *  adding cuts to rule out each of these.
  */
-
+/*#define SCIP_DEBUG*/
 #include "circuit_cuts.h"
+#include "probdata_bn.h"
 #include "utils.h"
 
 #define DEFAULT_MAX_CYCLES 1000
@@ -454,7 +455,10 @@ static SCIP_RETCODE addCuts(
    SCIP_Bool forcecuts,
    SCIP_Bool* found_efficacious_ptr,
    SCIP_Bool* cutoff,
-   CircuitCutsStorage* ccs
+   CircuitCutsStorage* ccs,
+   CLUSTER_CUT***  cluster_cuts,              /**< used to return the cuts themselves */
+   SCIP_Bool storecuts,
+   SCIP_Bool knapsackonly
    )
 {
    int i;
@@ -463,6 +467,14 @@ static SCIP_RETCODE addCuts(
    SCIP_ROW* cluster_cut;
    SCIP_ROW* cycle_cut;
 
+   /* only store found cuts if pricing */
+   /* at most nsols cuts will be added */
+   if( storecuts )
+      SCIP_CALL( SCIPallocBlockMemoryArray(scip, cluster_cuts, cycles->size) );
+   else
+      *cluster_cuts = NULL;
+
+   
    for( i = 0; i < cycles->size; i++ )
    {
       Vector* this_cycle = cycles->items[i];
@@ -493,7 +505,8 @@ static SCIP_RETCODE addCuts(
                excluded_cycle[num_excluded_cycle++] = this_var;
          }
 
-         if( num_excluded_cluster < num_included_cluster )
+         /* when pricing only use 'knapsack style' cuts */
+         if( !knapsackonly && num_excluded_cluster < num_included_cluster )
          {
             SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cluster_cut, num_excluded_cluster, excluded_cluster, -1.0) );
             cluster_rhs -= 1;
@@ -502,7 +515,8 @@ static SCIP_RETCODE addCuts(
          {
             SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cluster_cut, num_included_cluster, included_cluster, 1.0) );
          }
-         if( num_excluded_cycle < num_included_cycle )
+         /* when pricing only use 'knapsack style' cuts */
+         if( !knapsackonly && num_excluded_cycle < num_included_cycle )
          {
             SCIP_CALL( SCIPaddVarsToRowSameCoef(scip, cycle_cut, num_excluded_cycle, excluded_cycle, -1.0) );
             cycle_rhs -= 1;
@@ -520,6 +534,17 @@ static SCIP_RETCODE addCuts(
       if( ccs->add_cluster_cuts )
       {
 
+         SCIPdebugMessage(" -> (Circuit) Cluster-cut <clustercut>: act=%f, rhs=%f, norm=%f, eff=%f, min=%f, max=%f (range=%f)\n",
+         SCIPgetRowLPActivity(scip, cluster_cut), SCIProwGetRhs(cluster_cut), SCIProwGetNorm(cluster_cut),
+         SCIPgetCutEfficacy(scip, NULL, cluster_cut),
+         SCIPgetRowMinCoef(scip, cluster_cut), SCIPgetRowMaxCoef(scip, cluster_cut),
+         SCIPgetRowMaxCoef(scip, cluster_cut) / SCIPgetRowMinCoef(scip, cluster_cut));
+         SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cluster_cut, NULL) ));
+
+         /* "-1" since don't want to repeat first element in the cycle */
+         if( storecuts )
+            SCIP_CALL( storeclustercut(scip, &((*cluster_cuts)[i]), NULL, cluster_cut, this_cycle->size - 1, this_cycle->items, 1) );
+
          SCIP_CALL( SCIPaddRow(scip, cluster_cut, forcecuts, cutoff) );
          if( *cutoff )
          {
@@ -532,6 +557,13 @@ static SCIP_RETCODE addCuts(
       }
       if( ccs->add_cycle_cuts )
       {
+
+         SCIPdebugMessage(" -> Cycle-cut <clustercut>: act=%f, rhs=%f, norm=%f, eff=%f, min=%f, max=%f (range=%f)\n",
+         SCIPgetRowLPActivity(scip, cycle_cut), SCIProwGetRhs(cycle_cut), SCIProwGetNorm(cycle_cut),
+         SCIPgetCutEfficacy(scip, NULL, cycle_cut),
+         SCIPgetRowMinCoef(scip, cycle_cut), SCIPgetRowMaxCoef(scip, cycle_cut),
+         SCIPgetRowMaxCoef(scip, cycle_cut) / SCIPgetRowMinCoef(scip, cycle_cut));
+         SCIPdebug(SCIP_CALL( SCIPprintRow(scip, cycle_cut, NULL) ));
 
          SCIP_CALL( SCIPaddRow(scip, cycle_cut, forcecuts, cutoff) );
          if( *cutoff )
@@ -591,7 +623,10 @@ SCIP_RETCODE CC_findCuts(
    int* nGen,
    SCIP_Bool forcecuts,
    SCIP_Bool* found_efficacious_ptr,
-   SCIP_Bool* cutoff
+   SCIP_Bool* cutoff,
+   CLUSTER_CUT***  cluster_cuts,              /**< used to return the cuts themselves */
+   SCIP_Bool storecuts,
+   SCIP_Bool knapsackonly
    )
 {
 
@@ -637,7 +672,8 @@ SCIP_RETCODE CC_findCuts(
       j = 0;
       for( i = 0; i < psd->n; i++ )
          if( ccs->index_array->items[i] == -1 )
-            SCIP_CALL( findStronglyConnectedComponents(i, &j, psd->n, ccs->index_array, ccs->lowlink, ccs->s, ccs->adj_matrix, ccs->components) );
+            SCIP_CALL( findStronglyConnectedComponents(i, &j, psd->n, ccs->index_array, ccs->lowlink, ccs->s,
+                  ccs->adj_matrix, ccs->components) );
 
       /* Sort the components (no real need for this) */
       for( i = 0; i < ccs->components->size; i++ )
@@ -660,7 +696,9 @@ SCIP_RETCODE CC_findCuts(
       }
 
       /* Do something with the cycles */
-      addCuts(scip, conshdlr, psd, sol, ccs->included_cluster, ccs->excluded_cluster, ccs->included_cycle, ccs->excluded_cycle, ccs->cycles, forcecuts, found_efficacious_ptr, cutoff, ccs);
+      addCuts(scip, conshdlr, psd, sol, ccs->included_cluster, ccs->excluded_cluster, ccs->included_cycle,
+         ccs->excluded_cycle, ccs->cycles, forcecuts, found_efficacious_ptr, cutoff, ccs,
+         cluster_cuts, storecuts, knapsackonly);
 
       /* Return */
       (*nGen) = ccs->cycles->size;
