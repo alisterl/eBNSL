@@ -58,7 +58,7 @@ To use the package you need to first compile GOBNILP by following the steps prov
 
 3. Compile GOBNILP
 
-    The included GOBNILP is modified from the development version [[GitHash:db37374](https://bitbucket.org/jamescussens/gobnilp/src/db373747e76955f35437170f9641c9130bf50e9a/)]. Type the following command in `./gobnilp`.
+    The included GOBNILP is modified from the development version [[GitHash:db37374](https://bitbucket.org/jamescussens/gobnilp/src/db373747e76955f35437170f9641c9130bf50e9a/)]. Type the following command in `./gobnilp/`.
 
     1. Link SCIP
 
@@ -281,7 +281,7 @@ To use the package you need to first compile GOBNILP by following the steps prov
   ```
   #!bash
 
-  ./run_score <scorename> <bf>
+  ./run_score.sh <scorename> <bf>
   ```
   where `<scorename>` is the name of the scoring file in `./scores/` and `<bf>` is the desired Bayes factor. For example, type `./run_score.sh wine.BIC.3 3` for `./scores/wine.BIC.3` and a Bayes factor of `3`.
   <details>
