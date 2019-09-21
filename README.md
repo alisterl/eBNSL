@@ -149,220 +149,229 @@ To use the package you need to first compile GOBNILP by following the steps prov
 
 ## Running the Experiments
 
-* To generate Bayesian networks within a factor of optimal from datasets, type
+The datasets used in the paper are provided in `./CSV/`. It is assumed that datasets do not include variable names or arities and the package will generate at most 150,000 networks. The settings `gobnilp/scoring/names` and `gobnilp/scoring/arities` in `./gen_score.sh`, and `gobnilp/countsols/sollimit` in `./run_score.sh` can be modified if necessary. You can use the scripts in the package to generate Bayesian networks within a factor of optimal from datasets, to score a dataset, and to collect networks within a factor of optimal from scoring files.
 
-  ```
-  #!bash
+### Generate Bayesian networks within a factor of optimal from datasets
 
-  ./run_csv.sh <probname> <score_type> <bf>
-  ```
+Type the following command in the main directory.
 
-  where `<probname>` is the name of the csv file in `./CSV/`, `<score_type>` is either `BIC` or `BDeu`, and `<bf>` is the desired Bayes factor. For example, type `./run_csv.sh wine BIC 3` for `./CSV/wine.csv`, `BIC` scoring function and a Bayes factor of `3`.
-  <details>
-    <summary>Sample output</summary>  
-  <p>
+```
+#!bash
 
-  ```
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+./run_csv.sh <probname> <score_type> <bf>
+```
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+where `<probname>` is the name of the csv file in `./CSV/`, `<score_type>` is either `BIC` or `BDeu`, and `<bf>` is the desired Bayes factor. For example, type `./run_csv.sh wine BIC 3` for `./CSV/wine.csv`, `BIC` scoring function and a Bayes factor of `3`.
+<details>
+  <summary>Sample output</summary>  
+<p>
 
-  Reading parameter file <./scores/settings/wine.BIC.3>.
-  File name:		./CSV/wine.csv
-  Problem name:		wine
-  Writing scores to ./scores/wine.BIC.3
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+```
+GOBNILP version development [GitHash: 9f8daa2 ]
+Solving the BN structure learning problem using SCIP.
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-  Reading parameter file <./results/settings/wine.BIC.3.opt>.
-  File name:		./scores/wine.BIC.3
-  Problem name:		wine.BIC
-  Number of variables: 14
-  Number of candidate parent sets: 931
+Reading parameter file <./scores/settings/wine.BIC.3>.
+File name:		./CSV/wine.csv
+Problem name:		wine
+Writing scores to ./scores/wine.BIC.3
+GOBNILP version development [GitHash: 9f8daa2 ]
+Solving the BN structure learning problem using SCIP.
 
-  presolving (3 rounds: 3 fast, 2 medium, 1 exhaustive):
-   100 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 91 changed sides, 91 changed coefficients
-   0 implications, 10028 cliques
-  presolved problem has 1104 variables (1104 bin, 0 int, 0 impl, 0 cont) and 587 constraints
+SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-  time | Best Network Found So Far |   Best Network Possible   | mem |  gap   |objleav|infleav
-   0.2s|       -1.286816e+03       |        0.000000e+00       |  14M|    Inf |     0 |     0
+Reading parameter file <./results/settings/wine.BIC.3.opt>.
+File name:		./scores/wine.BIC.3
+Problem name:		wine.BIC
+Number of variables: 14
+Number of candidate parent sets: 931
 
-  ...
+presolving (3 rounds: 3 fast, 2 medium, 1 exhaustive):
+ 100 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 91 changed sides, 91 changed coefficients
+ 0 implications, 10028 cliques
+presolved problem has 1104 variables (1104 bin, 0 int, 0 impl, 0 cont) and 587 constraints
 
-  SCIP Status        : problem is solved [optimal solution found]
-  Solving Time (sec) : 1.52
-  Solving Nodes      : 1
-  Primal Bound       : -1.25844590861000e+03 (19 solutions)
-  Dual Bound         : -1.25844590861000e+03
-  Gap                : 0.00 %
-  Writing output to ./results/wine.BIC.3.opt
+time | Best Network Found So Far |   Best Network Possible   | mem |  gap   |objleav|infleav
+ 0.2s|       -1.286816e+03       |        0.000000e+00       |  14M|    Inf |     0 |     0
 
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+...
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+SCIP Status        : problem is solved [optimal solution found]
+Solving Time (sec) : 1.52
+Solving Nodes      : 1
+Primal Bound       : -1.25844590861000e+03 (19 solutions)
+Dual Bound         : -1.25844590861000e+03
+Gap                : 0.00 %
+Writing output to ./results/wine.BIC.3.opt
 
-  Reading parameter file <./results/settings/wine.BIC.3>.
-  File name:		./scores/wine.BIC.3
-  Problem name:		wine.BIC
-  Number of variables: 14
-  Number of candidate parent sets: 931
+GOBNILP version development [GitHash: 9f8daa2 ]
+Solving the BN structure learning problem using SCIP.
 
-  WARNING: counting forces parameter <misc/usesymmetry> to 0
-  presolving:
-  (round 1, fast)       9 del vars, 18 del conss, 0 add conss, 0 chg bounds, 0 chg sides, 0 chg coeffs, 0 upgd conss, 0 impls, 584 clqs
-     (0.2s) probing: 1000/1195 (83.7%) - 0 fixings, 0 aggregations, 10998 implications, 0 bound changes
-     (0.2s) probing: 1001/1195 (83.8%) - 0 fixings, 0 aggregations, 11006 implications, 0 bound changes
-     (0.2s) probing aborted: 1000/1000 successive useless probings
-  presolving (2 rounds: 2 fast, 1 medium, 1 exhaustive):
-   9 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 0 changed sides, 0 changed coefficients
-   0 implications, 11590 cliques
-  presolved problem has 1195 variables (1195 bin, 0 int, 0 impl, 0 cont) and 587 constraints
-        2 constraints of type <metadata>
-      584 constraints of type <setppc>
-        1 constraints of type <dagcluster>
-  Presolving Time: 0.15
+SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-   time | node  | left  |LP iter|LP it/n| mem |mdpt |frac |vars |cons |cols |rows |cuts |confs|strbr|  dualbound   | primalbound  |  gap   
-    0.2s|     1 |     0 |    15 |     - |  12M|   0 |   0 |1195 | 587 |1195 | 584 |   0 |   0 |   0 |-1.174130e+03 |-1.259545e+03*|   7.27%
+Reading parameter file <./results/settings/wine.BIC.3>.
+File name:		./scores/wine.BIC.3
+Problem name:		wine.BIC
+Number of variables: 14
+Number of candidate parent sets: 931
 
-  ...
+WARNING: counting forces parameter <misc/usesymmetry> to 0
+presolving:
+(round 1, fast)       9 del vars, 18 del conss, 0 add conss, 0 chg bounds, 0 chg sides, 0 chg coeffs, 0 upgd conss, 0 impls, 584 clqs
+   (0.2s) probing: 1000/1195 (83.7%) - 0 fixings, 0 aggregations, 10998 implications, 0 bound changes
+   (0.2s) probing: 1001/1195 (83.8%) - 0 fixings, 0 aggregations, 11006 implications, 0 bound changes
+   (0.2s) probing aborted: 1000/1000 successive useless probings
+presolving (2 rounds: 2 fast, 1 medium, 1 exhaustive):
+ 9 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 0 changed sides, 0 changed coefficients
+ 0 implications, 11590 cliques
+presolved problem has 1195 variables (1195 bin, 0 int, 0 impl, 0 cont) and 587 constraints
+      2 constraints of type <metadata>
+    584 constraints of type <setppc>
+      1 constraints of type <dagcluster>
+Presolving Time: 0.15
 
-  SCIP Status        : problem is solved [infeasible] (objective limit reached)
-  Solving Time (sec) : 3.35
-  Solving Nodes      : 2792
-  Primal Bound       : -1.25954452128867e+03 (objective limit, 0 solutions)
-  Dual Bound         : -1.25954452128867e+03
-  Gap                : 0.00 %
-  Found this many solutions: 308
-  Solutions written to ./results/wine.BIC.3.
-  ```
+ time | node  | left  |LP iter|LP it/n| mem |mdpt |frac |vars |cons |cols |rows |cuts |confs|strbr|  dualbound   | primalbound  |  gap   
+  0.2s|     1 |     0 |    15 |     - |  12M|   0 |   0 |1195 | 587 |1195 | 584 |   0 |   0 |   0 |-1.174130e+03 |-1.259545e+03*|   7.27%
 
-  </p>
-  </details>
+...
 
-* To generate pruned scoring files from datasets, type
+SCIP Status        : problem is solved [infeasible] (objective limit reached)
+Solving Time (sec) : 3.35
+Solving Nodes      : 2792
+Primal Bound       : -1.25954452128867e+03 (objective limit, 0 solutions)
+Dual Bound         : -1.25954452128867e+03
+Gap                : 0.00 %
+Found this many solutions: 308
+Solutions written to ./results/wine.BIC.3.
+```
 
-  ```
-  #!bash
+</p>
+</details>
 
-  ./gen_score.sh <probname> <score_type> <bf>
-  ```
+### Gnerate pruned scoring files from datasets
 
-  where `<probname>` is the name of the csv file in `./CSV/`, `<score_type>` is either `BIC` or `BDeu`, and `<bf>` is the desired Bayes factor. For example, type `./gen_score.sh wine BDeu 3` for `./CSV/wine.csv`, `BDeu` scoring function and a Bayes factor of `3`.
-  <details>
-    <summary>Sample output</summary>  
-  <p>
+Type the following command in the main directory.
 
-  ```
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+```
+#!bash
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+./gen_score.sh <probname> <score_type> <bf>
+```
 
-  Reading parameter file <./scores/settings/wine.BDeu.3>.
-  File name:		./CSV/wine.csv
-  Problem name:		wine
-  Writing scores to ./scores/wine.BDeu.3
-  ```
+where `<probname>` is the name of the csv file in `./CSV/`, `<score_type>` is either `BIC` or `BDeu`, and `<bf>` is the desired Bayes factor. For example, type `./gen_score.sh wine BDeu 3` for `./CSV/wine.csv`, `BDeu` scoring function and a Bayes factor of `3`.
+<details>
+  <summary>Sample output</summary>  
+<p>
 
-  </p>
-  </details>
+```
+GOBNILP version development [GitHash: 9f8daa2 ]
+Solving the BN structure learning problem using SCIP.
 
-* To collect Bayesian networks from pruned scoring files, type
-  ```
-  #!bash
+SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-  ./run_score.sh <scorename> <bf>
-  ```
-  where `<scorename>` is the name of the scoring file in `./scores/` and `<bf>` is the desired Bayes factor. For example, type `./run_score.sh wine.BIC.3 3` for `./scores/wine.BIC.3` and a Bayes factor of `3`.
-  <details>
-    <summary>Sample output</summary>  
-  <p>
+Reading parameter file <./scores/settings/wine.BDeu.3>.
+File name:		./CSV/wine.csv
+Problem name:		wine
+Writing scores to ./scores/wine.BDeu.3
+```
 
-  ```
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+</p>
+</details>
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+### Collect Bayesian networks from pruned scoring files
 
-  Reading parameter file <./results/settings/wine.BIC.3.opt>.
-  File name:		./scores/wine.BIC.3
-  Problem name:		wine.BIC
-  Number of variables: 14
-  Number of candidate parent sets: 931
+Type the following command in the main directory.
 
-  presolving (3 rounds: 3 fast, 2 medium, 1 exhaustive):
-   100 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 91 changed sides, 91 changed coefficients
-   0 implications, 10028 cliques
-  presolved problem has 1104 variables (1104 bin, 0 int, 0 impl, 0 cont) and 587 constraints
+```
+#!bash
 
-  time | Best Network Found So Far |   Best Network Possible   | mem |  gap   |objleav|infleav
-   0.4s|       -1.286816e+03       |        0.000000e+00       |  14M|    Inf |     0 |     0
+./run_score.sh <scorename> <bf>
+```
+where `<scorename>` is the name of the scoring file in `./scores/` and `<bf>` is the desired Bayes factor. For example, type `./run_score.sh wine.BIC.3 3` for `./scores/wine.BIC.3` and a Bayes factor of `3`.
+<details>
+  <summary>Sample output</summary>  
+<p>
 
-  ...
+```
+GOBNILP version development [GitHash: 9f8daa2 ]
+Solving the BN structure learning problem using SCIP.
 
-  SCIP Status        : problem is solved [optimal solution found]
-  Solving Time (sec) : 1.74
-  Solving Nodes      : 1
-  Primal Bound       : -1.25844590861000e+03 (19 solutions)
-  Dual Bound         : -1.25844590861000e+03
-  Gap                : 0.00 %
-  Writing output to ./results/wine.BIC.3.opt
+SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-  GOBNILP version development [GitHash: 9f8daa2 ]
-  Solving the BN structure learning problem using SCIP.
+Reading parameter file <./results/settings/wine.BIC.3.opt>.
+File name:		./scores/wine.BIC.3
+Problem name:		wine.BIC
+Number of variables: 14
+Number of candidate parent sets: 931
 
-  SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
-  Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
+presolving (3 rounds: 3 fast, 2 medium, 1 exhaustive):
+ 100 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 91 changed sides, 91 changed coefficients
+ 0 implications, 10028 cliques
+presolved problem has 1104 variables (1104 bin, 0 int, 0 impl, 0 cont) and 587 constraints
 
-  Reading parameter file <./results/settings/wine.BIC.3>.
-  File name:		./scores/wine.BIC.3
-  Problem name:		wine.BIC
-  Number of variables: 14
-  Number of candidate parent sets: 931
+time | Best Network Found So Far |   Best Network Possible   | mem |  gap   |objleav|infleav
+ 0.4s|       -1.286816e+03       |        0.000000e+00       |  14M|    Inf |     0 |     0
 
-  WARNING: counting forces parameter <misc/usesymmetry> to 0
-  presolving:
-  (round 1, fast)       9 del vars, 18 del conss, 0 add conss, 0 chg bounds, 0 chg sides, 0 chg coeffs, 0 upgd conss, 0 impls, 584 clqs
-     (0.2s) probing: 1000/1195 (83.7%) - 0 fixings, 0 aggregations, 10998 implications, 0 bound changes
-     (0.2s) probing: 1001/1195 (83.8%) - 0 fixings, 0 aggregations, 11006 implications, 0 bound changes
-     (0.2s) probing aborted: 1000/1000 successive useless probings
-  presolving (2 rounds: 2 fast, 1 medium, 1 exhaustive):
-   9 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 0 changed sides, 0 changed coefficients
-   0 implications, 11590 cliques
-  presolved problem has 1195 variables (1195 bin, 0 int, 0 impl, 0 cont) and 587 constraints
-        2 constraints of type <metadata>
-      584 constraints of type <setppc>
-        1 constraints of type <dagcluster>
-  Presolving Time: 0.16
+...
 
-   time | node  | left  |LP iter|LP it/n| mem |mdpt |frac |vars |cons |cols |rows |cuts |confs|strbr|  dualbound   | primalbound  |  gap   
-    0.2s|     1 |     0 |    15 |     - |  12M|   0 |   0 |1195 | 587 |1195 | 584 |   0 |   0 |   0 |-1.174130e+03 |-1.259545e+03*|   7.27%
+SCIP Status        : problem is solved [optimal solution found]
+Solving Time (sec) : 1.74
+Solving Nodes      : 1
+Primal Bound       : -1.25844590861000e+03 (19 solutions)
+Dual Bound         : -1.25844590861000e+03
+Gap                : 0.00 %
+Writing output to ./results/wine.BIC.3.opt
 
-  ...
+GOBNILP version development [GitHash: 9f8daa2 ]
+Solving the BN structure learning problem using SCIP.
 
-  SCIP Status        : problem is solved [infeasible] (objective limit reached)
-  Solving Time (sec) : 3.54
-  Solving Nodes      : 2792
-  Primal Bound       : -1.25954452128867e+03 (objective limit, 0 solutions)
-  Dual Bound         : -1.25954452128867e+03
-  Gap                : 0.00 %
-  Found this many solutions: 308
-  Solutions written to ./results/wine.BIC.3.
-  ```
+SCIP version 6.0.2 [precision: 8 byte] [memory: block] [mode: optimized] [LP solver: CPLEX 12.9.0.0] [GitHash: e639a0059d]
+Copyright (C) 2002-2019 Konrad-Zuse-Zentrum fuer Informationstechnik Berlin (ZIB)
 
-  </p>
-  </details>
+Reading parameter file <./results/settings/wine.BIC.3>.
+File name:		./scores/wine.BIC.3
+Problem name:		wine.BIC
+Number of variables: 14
+Number of candidate parent sets: 931
+
+WARNING: counting forces parameter <misc/usesymmetry> to 0
+presolving:
+(round 1, fast)       9 del vars, 18 del conss, 0 add conss, 0 chg bounds, 0 chg sides, 0 chg coeffs, 0 upgd conss, 0 impls, 584 clqs
+   (0.2s) probing: 1000/1195 (83.7%) - 0 fixings, 0 aggregations, 10998 implications, 0 bound changes
+   (0.2s) probing: 1001/1195 (83.8%) - 0 fixings, 0 aggregations, 11006 implications, 0 bound changes
+   (0.2s) probing aborted: 1000/1000 successive useless probings
+presolving (2 rounds: 2 fast, 1 medium, 1 exhaustive):
+ 9 deleted vars, 18 deleted constraints, 0 added constraints, 0 tightened bounds, 0 added holes, 0 changed sides, 0 changed coefficients
+ 0 implications, 11590 cliques
+presolved problem has 1195 variables (1195 bin, 0 int, 0 impl, 0 cont) and 587 constraints
+      2 constraints of type <metadata>
+    584 constraints of type <setppc>
+      1 constraints of type <dagcluster>
+Presolving Time: 0.16
+
+ time | node  | left  |LP iter|LP it/n| mem |mdpt |frac |vars |cons |cols |rows |cuts |confs|strbr|  dualbound   | primalbound  |  gap   
+  0.2s|     1 |     0 |    15 |     - |  12M|   0 |   0 |1195 | 587 |1195 | 584 |   0 |   0 |   0 |-1.174130e+03 |-1.259545e+03*|   7.27%
+
+...
+
+SCIP Status        : problem is solved [infeasible] (objective limit reached)
+Solving Time (sec) : 3.54
+Solving Nodes      : 2792
+Primal Bound       : -1.25954452128867e+03 (objective limit, 0 solutions)
+Dual Bound         : -1.25954452128867e+03
+Gap                : 0.00 %
+Found this many solutions: 308
+Solutions written to ./results/wine.BIC.3.
+```
+
+</p>
+</details>
 
 ## Authors
 Please send questions and comments to alister.liao AT uwaterloo.ca.

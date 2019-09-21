@@ -25,8 +25,7 @@ gobnilp/scoring/score_type = \"$2\"" > ./scores/settings/$1.$2.$3
 
 if [ $2 == "BIC" ]
 then
-num_lines=$(wc -l < ./CSV/$1.csv)
-num_data=$(($num_lines-2))
+num_data=$(wc -l < ./CSV/$1.csv)
 num_par=$(echo "l($num_data)/l(2)+l($3)" | bc -l)
 num_par=$(echo "($num_par+1)/1" | bc)
 
