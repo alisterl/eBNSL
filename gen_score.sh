@@ -20,7 +20,7 @@ gobnilp/outputfile/scores = \"./scores/$1.$2.$3\"
 gobnilp/scoring/arities = FALSE
 gobnilp/scoring/names = FALSE
 gobnilp/scoring/prune = TRUE
-gobnilp/scoring/prunegap = -$3
+gobnilp/scoring/prunegap = $(echo "-l($3)" | bc -l)
 gobnilp/scoring/score_type = \"$2\"" > ./scores/settings/$1.$2.$3
 
 if [ $2 == "BIC" ]

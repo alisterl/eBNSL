@@ -18,13 +18,12 @@ gobnilp/outputfile/solution = \"./results/$1.opt\"" > ./results/settings/$1.opt
 ./gobnilp/bin/gobnilp -f=jkl -g=./results/settings/$1.opt ./scores/$1
 
 score=$(tail -1 ./results/$1.opt | awk '{print $4}')
-score=$(echo "$score-l($2)" | bc -l)
 
 echo "#GOBNILP parameters for collecting networks
 gobnilp/countsols = TRUE
 gobnilp/countsols/collect = TRUE
 gobnilp/countsols/sollimit = 150000
-gobnilp/objlimit = $score
+gobnilp/objlimit = $(echo "$score-l($2)" | bc -l)
 gobnilp/outputfile/countsols = \"./results/$1\"" > ./results/settings/$1
 
 ./gobnilp/bin/gobnilp -g=./results/settings/$1 -f=jkl ./scores/$1
